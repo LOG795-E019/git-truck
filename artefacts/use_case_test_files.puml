@@ -1,0 +1,7 @@
+Cas d'utilisation pour l'identification des fichiers de tests
+
+pré-condition: le repository doit avoir été chargé.
+
+1. L'utilisateur sélectionne la couleur par fichiers de tests.
+2. Le frontend affiche la liste des fichiers en colorant que les fichiers contenant le mot "test"
+3. L'utilisateur peut sélectionner les fichiers colorés afin d'obtenir différentes statistiques
