@@ -1,0 +1,32 @@
+@startuml
+package "Frontend" {
+  [Options.tsx] --> [Chart.tsx]
+  [Chart.tsx] --> [DetailsCard.tsx]
+  [Chart.tsx] ..> [metrics/metrics.ts] : useMetric (hook/context)
+  [DetailsCard.tsx] ..> [metrics/metrics.ts] : useMetric (hook/context)
+}
+
+package "Remix Route" {
+  [routes/$repo.$.tsx] --> [InstanceManager.server.ts]
+}
+
+package "Backend" {
+  [InstanceManager.server.ts] --> [ServerInstance]
+  [ServerInstance] --> [DB.server.ts]
+  [DB.server.ts] --> [DuckDB]
+}
+
+package "Metrics" {
+  [metrics/metrics.ts] --> [metrics/fileExtension.ts] : setExtensionColor
+  [metrics/metrics.ts] --> [metrics/metricUtils.ts] : getColorFromExtension
+}
+
+[Options.tsx] ..> [routes/$repo.$.tsx] : fetch metrics (metricType=FILE_TYPE)
+[Chart.tsx] ..> [routes/$repo.$.tsx] : fetch metrics data
+[DetailsCard.tsx] ..> [routes/$repo.$.tsx] : fetch author/contribs per filetype
+
+[routes/$repo.$.tsx] ..> [metrics/metrics.ts] : createMetricData, getMetricCalcs
+
+[DB.server.ts] ..> [DuckDB] : SQL query (GROUP BY file extension)
+
+@enduml
