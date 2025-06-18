@@ -2,7 +2,7 @@ import type { HierarchyCircularNode, HierarchyNode, HierarchyRectangularNode } f
 import { hierarchy, pack, treemap, treemapResquarify } from "d3-hierarchy"
 import type { MouseEventHandler } from "react"
 import { useDeferredValue, memo, useEffect, useMemo } from "react"
-import type { GitBlobObject, GitObject, GitTreeObject } from "~/analyzer/model"
+import type { FileTypeTreeObject, GitBlobObject, GitObject, GitTreeObject } from "~/analyzer/model"
 import { useClickedObject } from "~/contexts/ClickedContext"
 import { useComponentSize } from "~/hooks"
 import {
@@ -27,6 +27,7 @@ import { usePath } from "../contexts/PathContext"
 import { getTextColorFromBackground, isBlob, isTree } from "~/util"
 import clsx from "clsx"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
+import { Grouping, GroupingType } from "~/metrics/grouping"
 import { useSearch } from "~/contexts/SearchContext"
 import type { DatabaseInfo } from "~/routes/$repo.$"
 import ignore, { type Ignore } from "ignore"
@@ -40,7 +41,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   const { searchResults } = useSearch()
   const size = useDeferredValue(rawSize)
   const { databaseInfo } = useData()
-  const { chartType, sizeMetric, depthType, hierarchyType, labelsVisible, renderCutoff } = useOptions()
+  const { chartType, sizeMetric, groupingType, depthType, hierarchyType, labelsVisible, renderCutoff } = useOptions()
   const { path } = usePath()
   const { clickedObject, setClickedObject } = useClickedObject()
   const { setPath } = usePath()
@@ -95,6 +96,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       size,
       chartType,
       sizeMetric,
+      groupingType,
       path,
       renderCutoff
     ).descendants()
@@ -119,19 +121,25 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
           onMouseOver: () => setHoveredObject(d.data as GitObject),
           onMouseOut: () => setHoveredObject(null)
         }
-      : {
-          onClick: (evt) => {
-            evt.stopPropagation()
-            setClickedObject(d.data)
-            setPath(d.data.path)
-          },
-          onMouseOver: (evt) => {
-            evt.stopPropagation()
-            if (!isRoot) setHoveredObject(d.data as GitObject)
-            else setHoveredObject(null)
-          },
-          onMouseOut: () => setHoveredObject(null)
-        }
+      : isTree(d.data)
+        ? {
+            onClick: (evt) => {
+              evt.stopPropagation()
+              setClickedObject(d.data)
+              setPath(d.data.path)
+            },
+            onMouseOver: (evt) => {
+              evt.stopPropagation()
+              if (!isRoot) setHoveredObject(d.data as GitObject)
+              else setHoveredObject(null)
+            },
+            onMouseOut: () => setHoveredObject(null)
+          }
+        : {
+            onClick: () => {},
+            onMouseOver: () => {},
+            onMouseOut: () => {}
+          }
   }
 
   const now = isChrome || isChromium || isEdgeChromium ? Date.now() : 0 // Necessary in chrome to update text positions
@@ -187,7 +195,7 @@ function filterGitTree(
   showFilesWithoutChanges: boolean,
   ig: Ignore
 ): GitTreeObject {
-  function filterNode(node: GitObject): GitObject | null {
+  function filterNode(node: GitTreeObject | GitBlobObject | FileTypeTreeObject): GitObject | null {
     if (ig.ignores(node.path)) {
       return null
     }
@@ -404,6 +412,7 @@ function createPartitionedHiearchy(
   size: { height: number; width: number },
   chartType: ChartType,
   sizeMetricType: SizeMetricType,
+  groupingType: GroupingType,
   path: string,
   renderCutoff: number
 ) {
@@ -422,7 +431,12 @@ function createPartitionedHiearchy(
     }
   }
 
-  const castedTree = currentTree as GitObject
+  let castedTree = currentTree as GitObject
+
+  // Grouping By Folder Name
+  if (groupingType == "FILE_TYPE") {
+    castedTree = fileTypesGrouping(currentTree as GitTreeObject)
+  }
 
   const hiearchy = hierarchy(castedTree)
     .sum((d) => {
@@ -517,7 +531,7 @@ function roundedRectPathFromRect(x: number, y: number, width: number, height: nu
           z`
 }
 
-function flatten(tree: GitTreeObject) {
+function flatten(tree: GitTreeObject | FileTypeTreeObject) {
   const flattened: GitBlobObject[] = []
   for (const child of tree.children) {
     if (child.type === "blob") {
@@ -527,4 +541,28 @@ function flatten(tree: GitTreeObject) {
     }
   }
   return flattened
+}
+
+function fileTypesGrouping(tree: GitTreeObject) {
+  const flattened = flatten(tree)
+
+  // Group by file type
+  const fileTypeTree: Record<string, FileTypeTreeObject> = {}
+
+  for (const file of flattened) {
+    const ext = file.name.split(".").pop() || "unknown" // TODO: Use JSON setting to group instead of just extension
+    if (!fileTypeTree[ext]) {
+      fileTypeTree[ext] = {
+        type: "filetype",
+        name: ext, // TODO: Use JSON setting to group instead of just extension
+        path: ext,
+        children: []
+      }
+    }
+    fileTypeTree[ext].children.push(file)
+  }
+
+  tree.children = Object.values(fileTypeTree)
+
+  return tree
 }

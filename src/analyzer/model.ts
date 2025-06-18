@@ -113,7 +113,14 @@ export interface GitTreeObject extends AbstractGitObject {
   type: "tree"
   name: string
   path: string
-  children: (GitTreeObject | GitBlobObject)[]
+  children: (GitTreeObject | GitBlobObject | FileTypeTreeObject)[]
+}
+
+export interface FileTypeTreeObject {
+  type: "filetype"
+  name: string
+  path: string
+  children: GitBlobObject[]
 }
 
 export interface GitCommitObject extends AbstractGitObject {

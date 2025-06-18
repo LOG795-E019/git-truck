@@ -21,6 +21,8 @@ import type { SizeMetricType } from "~/metrics/sizeMetric"
 import type { DepthType } from "~/metrics/chartDepth"
 import type { CommitTab } from "~/contexts/CommitTabContext"
 import { CommitTabContext, getDefaultCommitTab } from "~/contexts/CommitTabContext"
+import { GroupingType } from "~/metrics/grouping"
+import { useSubmit } from "@remix-run/react"
 
 interface ProvidersProps {
   children: React.ReactNode
@@ -33,6 +35,8 @@ export function Providers({ children, data }: ProvidersProps) {
   const [searchResults, setSearchResults] = useState<Record<string, GitObject>>({})
   const [path, setPath] = useState(data.repo.name)
   const [clickedObject, setClickedObject] = useState<GitObject | null>(null)
+
+  const submit = useSubmit()
 
   const metricsData: MetricsData = useMemo(() => {
     console.time("metrics")
@@ -106,7 +110,21 @@ export function Providers({ children, data }: ProvidersProps) {
           commitSearch
         })),
       setSizeMetricType: (sizeMetric: SizeMetricType) =>
-        setOptions((prevOptions) => ({ ...(prevOptions ?? getDefaultOptionsContextValue()), sizeMetric })),
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          sizeMetric
+        })),
+      setGroupingType: (groupingType: GroupingType) => {
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          groupingType
+        }))
+
+        // Use Remix's submit function to allow the grouping to
+        const formData = new FormData()
+        formData.append("refresh", "true")
+        submit(formData, { method: "post", action: window.location.pathname })
+      },
       setHoveredBlob: (blob: GitBlobObject | null) =>
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
@@ -148,7 +166,7 @@ export function Providers({ children, data }: ProvidersProps) {
           linkMetricAndSizeMetric: link
         }))
     }),
-    [options]
+    [options, submit]
   )
 
   useEffect(() => {
