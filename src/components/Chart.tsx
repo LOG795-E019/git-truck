@@ -33,6 +33,7 @@ import type { DatabaseInfo } from "~/routes/$repo.$"
 import ignore, { type Ignore } from "ignore"
 import { cn, usePrefersLightMode } from "~/styling"
 import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
+import { createHash } from "crypto"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -108,6 +109,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
     setHoveredObject(null)
   }, [chartType, size, setHoveredObject])
 
+  
   const createGroupHandlers: (
     d: CircleOrRectHiearchyNode,
     isRoot: boolean
@@ -436,6 +438,7 @@ function createPartitionedHiearchy(
   // Grouping By Folder Name
   if (groupingType == "FILE_TYPE") {
     castedTree = fileTypesGrouping(currentTree as GitTreeObject)
+    console.log("Grouping by file type", castedTree)
   }
 
   const hiearchy = hierarchy(castedTree)
@@ -531,38 +534,73 @@ function roundedRectPathFromRect(x: number, y: number, width: number, height: nu
           z`
 }
 
-function flatten(tree: GitTreeObject | FileTypeTreeObject) {
-  const flattened: GitBlobObject[] = []
+// Helper to flatten the tree to blobs
+function flatten(tree: GitTreeObject): GitBlobObject[] {
+  let files: GitBlobObject[] = []
   for (const child of tree.children) {
-    if (child.type === "blob") {
-      flattened.push(child)
-    } else {
-      flattened.push(...flatten(child))
+    if (child.type === "tree") {
+      files = files.concat(flatten(child))
+    } else if (child.type === "blob") {
+      files.push(child)
     }
   }
-  return flattened
+  return files
 }
 
-function fileTypesGrouping(tree: GitTreeObject) {
-  const flattened = flatten(tree)
+// Helper to hash a string
+function hashString(str: string): string {
+  return createHash("sha1").update(str).digest("hex")
+}
 
-  // Group by file type
-  const fileTypeTree: Record<string, FileTypeTreeObject> = {}
+// Main grouping function
+export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
+  const blobs = flatten(tree)
+  const fileTypeGroups: Record<string, GitBlobObject[]> = {}
 
-  for (const file of flattened) {
-    const ext = file.name.split(".").pop() || "unknown" // TODO: Use JSON setting to group instead of just extension
-    if (!fileTypeTree[ext]) {
-      fileTypeTree[ext] = {
-        type: "filetype",
-        name: ext, // TODO: Use JSON setting to group instead of just extension
-        path: ext,
-        children: []
+  for (const file of blobs) {
+    const ext = file.name.split(".").pop() || "unknown"
+    if (!fileTypeGroups[ext]) fileTypeGroups[ext] = []
+    // DO NOT change file.path! Keep the original Git path.
+    fileTypeGroups[ext].push(file)
+  }
+
+  const children: GitTreeObject[] = Object.entries(fileTypeGroups).map(([ext, files]) => {
+    // Find the common ancestor directory for all files in this group
+    const parentPaths = files.map(f => f.path.substring(0, f.path.lastIndexOf("/")));
+    function findCommonAncestor(paths: string[]): string {
+      if (paths.length === 0) return "";
+      const splitPaths = paths.map(p => p.split("/").filter(Boolean));
+      let common: string[] = [];
+      for (let i = 0; ; i++) {
+        const segment = splitPaths[0][i];
+        if (segment === undefined) break;
+        if (splitPaths.every(parts => parts[i] === segment)) {
+          common.push(segment);
+        } else {
+          break;
+        }
       }
+      return common.length ? "/" + common.join("/") : "";
     }
-    fileTypeTree[ext].children.push(file)
-  }
+    const commonAncestor = findCommonAncestor(parentPaths);
+    const groupPath = commonAncestor ? `${commonAncestor}/.${ext}` : `/.${ext}`;
 
-  tree.children = Object.values(fileTypeTree)
+    return {
+      type: "tree",
+      name: ext,
+      path:  groupPath,
+      children: files,
+      hash: hashString(files.map(f => f.hash).join(",")),
+    }
+  });
 
-  return tree
+    return {
+      type: "tree",
+      name: "root-by-filetype",
+      path: tree.path,
+      children,
+      hash: hashString("root-by-filetype" + children.map(c => c.hash).join(",")),
+    }
 }
+
+
