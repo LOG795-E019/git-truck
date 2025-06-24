@@ -351,7 +351,7 @@ export default class DB {
     const res = await this.query(`
       SELECT COUNT(DISTINCT commithash) AS count
       FROM filechanges_commits_renamed_cached
-      WHERE filepath GLOB '${path}*';
+      WHERE filepath GLOB '${path}*' AND filepath LIKE '%${fileType}';
     `)
     console.log("getCommitCountForFileType result", res)
     return Number(res[0]["count"])
