@@ -36,7 +36,7 @@ export function DetailsCard({
 }) {
   const { setClickedObject, clickedObject } = useClickedObject()
   const location = useLocation()
-  const { metricType } = useOptions()
+  const { metricType, groupingType } = useOptions()
   const { state } = useNavigation()
   const { setPath, path } = usePath()
   const { databaseInfo } = useData()
@@ -60,6 +60,7 @@ export function DetailsCard({
     const searchParams = new URLSearchParams()
     searchParams.set("branch", databaseInfo.branch)
     searchParams.set("repo", databaseInfo.repo)
+    searchParams.set("grouping", groupingType)
     if (!clickedObject?.path) return
     searchParams.set("path", clickedObject.path)
     commitFetcher.load(`/commitcount?${searchParams.toString()}`)
@@ -86,6 +87,7 @@ export function DetailsCard({
     searchParams.set("repo", databaseInfo.repo)
     if (!clickedObject?.path) return
     searchParams.set("path", clickedObject.path)
+    searchParams.set("grouping", groupingType)
     searchParams.set("isblob", String(clickedObject.type === "blob"))
     fetcher.load(`/authordist?${searchParams.toString()}`)
   }, [clickedObject, databaseInfo])
