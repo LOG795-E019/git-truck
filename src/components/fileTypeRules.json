@@ -1,0 +1,4 @@
+[
+  { "name": "test", "pattern": "test"},
+  { "name": "config", "pattern": "config"}
+]

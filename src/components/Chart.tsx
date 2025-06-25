@@ -34,6 +34,7 @@ import ignore, { type Ignore } from "ignore"
 import { cn, usePrefersLightMode } from "~/styling"
 import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
 import { createHash } from "crypto"
+import fileTypeRules from "./fileTypeRules.json";
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -577,11 +578,23 @@ export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
   const blobs = flatten(tree)
   const fileTypeGroups: Record<string, GitBlobObject[]> = {}
 
+  // Determine the file type based on the file name using the rules defined in fileTypeRules.json
+  // If no rule matches, use the file extension as the type
   for (const file of blobs) {
-    const ext = file.name.split(".").pop() || "unknown"
-    if (!fileTypeGroups[ext]) fileTypeGroups[ext] = []
+    let type : string | undefined
+    for (const rule of fileTypeRules) {
+      const regex = new RegExp(rule.pattern, "i")
+      if(regex.test(file.name)) {
+        type = rule.name;
+        break;
+      }
+    }
+    if (!type) {
+      type = file.name.split(".").pop() || "unknown"
+    }
+    if (!fileTypeGroups[type]) fileTypeGroups[type] = []
     // DO NOT change file.path! Keep the original Git path.
-    fileTypeGroups[ext].push(file)
+    fileTypeGroups[type].push(file)
   }
 
   const children: GitTreeObject[] = Object.entries(fileTypeGroups).map(([ext, files]) => {
@@ -603,7 +616,13 @@ export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
       return common.length ? "/" + common.join("/") : "";
     }
     const commonAncestor = findCommonAncestor(parentPaths);
-    const groupPath = commonAncestor ? `${commonAncestor}/.${ext}` : `/.${ext}`;
+
+    // If the file is part of the predetermined file types, don't add a dot before the file type (e.g. test, config, etc.)
+    // Otherwise, add a dot before the file type as its an extension (e.g. .js, .css, etc.)
+    const fileTypeIsNotAnExtension = fileTypeRules.map(rule => rule.name);
+    const groupPath = commonAncestor
+    ? `${commonAncestor}/${fileTypeIsNotAnExtension.includes(ext) ? ext : "." + ext}`
+    : `/${fileTypeIsNotAnExtension.includes(ext) ? ext : "." + ext}`;
 
     return {
       type: "tree",
