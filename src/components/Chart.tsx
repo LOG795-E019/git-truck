@@ -420,6 +420,13 @@ function createPartitionedHiearchy(
 ) {
   let currentTree = tree
   const steps = path.substring(tree.name.length + 1).split("/")
+  const extMatch = path.match(/\/\.(\w+)$/)
+  const extension = extMatch ? extMatch[1] : ""
+  console.log("EXTENSION: ", extension)
+  if (groupingType === "FILE_TYPE" && extension !== "") {
+    currentTree = filterByExtension(currentTree, extension)
+  }
+
   for (let i = 0; i < steps.length; i++) {
     for (const child of currentTree.children) {
       if (child.type === "tree") {
@@ -432,7 +439,7 @@ function createPartitionedHiearchy(
       }
     }
   }
-
+  
   let castedTree = currentTree as GitObject
 
   // Grouping By Folder Name
@@ -502,6 +509,19 @@ function filterTree(node: HierarchyNode<GitObject>, filter: (child: HierarchyNod
   }
 }
 
+function filterByExtension(node: GitTreeObject, extension: string): GitTreeObject {
+  const filteredChildren = node.children.map(child => {
+      if (child.type === "tree") {
+        const filtered = filterByExtension(child, extension)
+        return filtered.children.length > 0 ? filtered : null
+      } else if (child.type === "blob") {
+        const ext = child.name.split(".").pop()
+        return ext === extension ? child : null
+      }
+      return null
+    }).filter(Boolean) as (GitTreeObject | GitBlobObject)[]
+      return { ...node, children: filteredChildren }
+}
 // a rx ry angle large-arc-flag sweep-flag dx dy
 // rx and ry are the two radii of the ellipse
 // angle represents a rotation (in degrees) of the ellipse relative to the x-axis;
@@ -602,5 +622,6 @@ export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
       hash: hashString("root-by-filetype" + children.map(c => c.hash).join(",")),
     }
 }
+
 
 
