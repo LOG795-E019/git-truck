@@ -593,9 +593,11 @@ export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
     if (!type) {
       type = file.name.split(".").pop() || "unknown"
     }
-    if (!fileTypeGroups[type]) fileTypeGroups[type] = []
-    // DO NOT change file.path! Keep the original Git path.
-    fileTypeGroups[type].push(file)
+    // Only group if extension is 4 characters or less
+    if (type.length <= 4) {
+      if (!fileTypeGroups[type]) fileTypeGroups[type] = []
+      fileTypeGroups[type].push(file)
+    }
   }
 
   const children: GitTreeObject[] = Object.entries(fileTypeGroups).map(([ext, files]) => {
