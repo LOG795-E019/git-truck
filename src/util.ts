@@ -1,7 +1,7 @@
 import type { HierarchyRectangularNode } from "d3-hierarchy"
 import { compare, valid, clean } from "semver"
 import colorConvert from "color-convert"
-import type { GitObject, GitBlobObject, GitTreeObject, FileTypeTreeObject } from "./analyzer/model"
+import type { GitObject, GitBlobObject, GitTreeObject } from "./analyzer/model"
 
 export function diagonal(d: HierarchyRectangularNode<unknown>) {
   const dx = d.x1 - d.x0
