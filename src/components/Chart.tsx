@@ -626,8 +626,8 @@ export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
 
     return {
       type: "tree",
-      name: ext,
-      path:  groupPath,
+      name: "." +ext,
+      path:  tree.path + "/."+ ext,
       children: files,
       hash: hashString(files.map(f => f.hash).join(",")),
     }
