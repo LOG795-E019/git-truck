@@ -2,7 +2,7 @@ import type { HierarchyCircularNode, HierarchyNode, HierarchyRectangularNode } f
 import { hierarchy, pack, treemap, treemapResquarify } from "d3-hierarchy"
 import type { MouseEventHandler } from "react"
 import { useDeferredValue, memo, useEffect, useMemo } from "react"
-import type { FileTypeTreeObject, GitBlobObject, GitObject, GitTreeObject } from "~/analyzer/model"
+import type { GitBlobObject, GitObject, GitTreeObject } from "~/analyzer/model"
 import { useClickedObject } from "~/contexts/ClickedContext"
 import { useComponentSize } from "~/hooks"
 import {
@@ -34,7 +34,7 @@ import ignore, { type Ignore } from "ignore"
 import { cn, usePrefersLightMode } from "~/styling"
 import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
 import { createHash } from "crypto"
-import fileTypeRules from "./fileTypeRules.json";
+import fileTypeRules from "./fileTypeRules.json"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -110,7 +110,6 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
     setHoveredObject(null)
   }, [chartType, size, setHoveredObject])
 
-  
   const createGroupHandlers: (
     d: CircleOrRectHiearchyNode,
     isRoot: boolean
@@ -198,7 +197,7 @@ function filterGitTree(
   showFilesWithoutChanges: boolean,
   ig: Ignore
 ): GitTreeObject {
-  function filterNode(node: GitTreeObject | GitBlobObject | FileTypeTreeObject): GitObject | null {
+  function filterNode(node: GitTreeObject | GitBlobObject): GitObject | null {
     if (ig.ignores(node.path)) {
       return null
     }
@@ -440,7 +439,7 @@ function createPartitionedHiearchy(
       }
     }
   }
-  
+
   let castedTree = currentTree as GitObject
 
   // Grouping By Folder Name
@@ -511,7 +510,8 @@ function filterTree(node: HierarchyNode<GitObject>, filter: (child: HierarchyNod
 }
 
 function filterByExtension(node: GitTreeObject, extension: string): GitTreeObject {
-  const filteredChildren = node.children.map(child => {
+  const filteredChildren = node.children
+    .map((child) => {
       if (child.type === "tree") {
         const filtered = filterByExtension(child, extension)
         return filtered.children.length > 0 ? filtered : null
@@ -520,8 +520,9 @@ function filterByExtension(node: GitTreeObject, extension: string): GitTreeObjec
         return ext === extension ? child : null
       }
       return null
-    }).filter(Boolean) as (GitTreeObject | GitBlobObject)[]
-      return { ...node, children: filteredChildren }
+    })
+    .filter(Boolean) as (GitTreeObject | GitBlobObject)[]
+  return { ...node, children: filteredChildren }
 }
 // a rx ry angle large-arc-flag sweep-flag dx dy
 // rx and ry are the two radii of the ellipse
@@ -581,12 +582,12 @@ export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
   // Determine the file type based on the file name using the rules defined in fileTypeRules.json
   // If no rule matches, use the file extension as the type
   for (const file of blobs) {
-    let type : string | undefined
+    let type: string | undefined
     for (const rule of fileTypeRules) {
       const regex = new RegExp(rule.pattern, "i")
-      if(regex.test(file.name)) {
-        type = rule.name;
-        break;
+      if (regex.test(file.name)) {
+        type = rule.name
+        break
       }
     }
     if (!type) {
@@ -599,48 +600,45 @@ export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
 
   const children: GitTreeObject[] = Object.entries(fileTypeGroups).map(([ext, files]) => {
     // Find the common ancestor directory for all files in this group
-    const parentPaths = files.map(f => f.path.substring(0, f.path.lastIndexOf("/")));
+    const parentPaths = files.map((f) => f.path.substring(0, f.path.lastIndexOf("/")))
     function findCommonAncestor(paths: string[]): string {
-      if (paths.length === 0) return "";
-      const splitPaths = paths.map(p => p.split("/").filter(Boolean));
-      let common: string[] = [];
+      if (paths.length === 0) return ""
+      const splitPaths = paths.map((p) => p.split("/").filter(Boolean))
+      let common: string[] = []
       for (let i = 0; ; i++) {
-        const segment = splitPaths[0][i];
-        if (segment === undefined) break;
-        if (splitPaths.every(parts => parts[i] === segment)) {
-          common.push(segment);
+        const segment = splitPaths[0][i]
+        if (segment === undefined) break
+        if (splitPaths.every((parts) => parts[i] === segment)) {
+          common.push(segment)
         } else {
-          break;
+          break
         }
       }
-      return common.length ? "/" + common.join("/") : "";
+      return common.length ? "/" + common.join("/") : ""
     }
-    const commonAncestor = findCommonAncestor(parentPaths);
+    const commonAncestor = findCommonAncestor(parentPaths)
 
     // If the file is part of the predetermined file types, don't add a dot before the file type (e.g. test, config, etc.)
     // Otherwise, add a dot before the file type as its an extension (e.g. .js, .css, etc.)
-    const fileTypeIsNotAnExtension = fileTypeRules.map(rule => rule.name);
+    const fileTypeIsNotAnExtension = fileTypeRules.map((rule) => rule.name)
     const groupPath = commonAncestor
-    ? `${commonAncestor}/${fileTypeIsNotAnExtension.includes(ext) ? ext : "." + ext}`
-    : `/${fileTypeIsNotAnExtension.includes(ext) ? ext : "." + ext}`;
+      ? `${commonAncestor}/${fileTypeIsNotAnExtension.includes(ext) ? ext : "." + ext}`
+      : `/${fileTypeIsNotAnExtension.includes(ext) ? ext : "." + ext}`
 
     return {
       type: "tree",
       name: "." +ext,
       path:  tree.path + "/."+ ext,
       children: files,
-      hash: hashString(files.map(f => f.hash).join(",")),
+      hash: hashString(files.map((f) => f.hash).join(","))
     }
-  });
+  })
 
-    return {
-      type: "tree",
-      name: "root-by-filetype",
-      path: tree.path,
-      children,
-      hash: hashString("root-by-filetype" + children.map(c => c.hash).join(",")),
-    }
+  return {
+    type: "tree",
+    name: "root-by-filetype",
+    path: tree.path,
+    children,
+    hash: hashString("root-by-filetype" + children.map((c) => c.hash).join(","))
+  }
 }
-
-
-
