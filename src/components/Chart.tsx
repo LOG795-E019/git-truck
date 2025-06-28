@@ -577,13 +577,16 @@ function hashString(str: string): string {
 export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
   const blobs = flatten(tree)
   const fileTypeGroups: Record<string, GitBlobObject[]> = {}
+  const longExtFiles: GitBlobObject[] = []
 
-  // 1. Group by extension (max 4 chars)
+  // 1. Group by extension (max 6 chars)
   for (const file of blobs) {
     const ext = file.name.split(".").pop() || "unknown"
-    if (ext.length <= 4) {
+    if (ext.length <= 6) {
       if (!fileTypeGroups[ext]) fileTypeGroups[ext] = []
       fileTypeGroups[ext].push(file)
+    } else {
+      longExtFiles.push(file)
     }
   }
 
@@ -636,11 +639,17 @@ export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
     }
   })
 
+  // Add files with long extensions directly under the root
+  const rootChildren = [
+    ...children,
+    ...longExtFiles
+  ]
+
   return {
     type: "tree",
     name: "root-by-filetype",
     path: tree.path,
-    children,
+    children: rootChildren,
     hash: hashString("root-by-filetype" + children.map((c) => c.hash).join(",")),
   }
 }
