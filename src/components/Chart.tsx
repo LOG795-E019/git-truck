@@ -574,65 +574,65 @@ function hashString(str: string): string {
   return createHash("sha1").update(str).digest("hex")
 }
 
-// Main grouping function
 export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
   const blobs = flatten(tree)
   const fileTypeGroups: Record<string, GitBlobObject[]> = {}
 
-  // Determine the file type based on the file name using the rules defined in fileTypeRules.json
-  // If no rule matches, use the file extension as the type
+  // 1. Group by extension (max 4 chars)
   for (const file of blobs) {
-    let type: string | undefined
-    for (const rule of fileTypeRules) {
-      const regex = new RegExp(rule.pattern, "i")
-      if (regex.test(file.name)) {
-        type = rule.name
-        break
-      }
-    }
-    if (!type) {
-      type = file.name.split(".").pop() || "unknown"
-    }
-    // Only group if extension is 4 characters or less
-    if (type.length <= 4) {
-      if (!fileTypeGroups[type]) fileTypeGroups[type] = []
-      fileTypeGroups[type].push(file)
+    const ext = file.name.split(".").pop() || "unknown"
+    if (ext.length <= 4) {
+      if (!fileTypeGroups[ext]) fileTypeGroups[ext] = []
+      fileTypeGroups[ext].push(file)
     }
   }
 
+  // 2. For each extension, group by fileTypeRules patterns
   const children: GitTreeObject[] = Object.entries(fileTypeGroups).map(([ext, files]) => {
-    // Find the common ancestor directory for all files in this group
-    const parentPaths = files.map((f) => f.path.substring(0, f.path.lastIndexOf("/")))
-    function findCommonAncestor(paths: string[]): string {
-      if (paths.length === 0) return ""
-      const splitPaths = paths.map((p) => p.split("/").filter(Boolean))
-      let common: string[] = []
-      for (let i = 0; ; i++) {
-        const segment = splitPaths[0][i]
-        if (segment === undefined) break
-        if (splitPaths.every((parts) => parts[i] === segment)) {
-          common.push(segment)
-        } else {
+    // Prepare subgroups by pattern name
+    const subGroups: Record<string, GitBlobObject[]> = {}
+    for (const rule of fileTypeRules) {
+      subGroups[rule.name] = []
+    }
+
+    // Assign files to subgroups or mark as unmatched
+    const unmatchedFiles: GitBlobObject[] = []
+    for (const file of files) {
+      let matched = false
+      for (const rule of fileTypeRules) {
+        const regex = new RegExp(rule.pattern, "i")
+        if (regex.test(file.path)) {
+          subGroups[rule.name].push(file)
+          matched = true
           break
         }
       }
-      return common.length ? "/" + common.join("/") : ""
+      if (!matched) {
+        unmatchedFiles.push(file)
+      }
     }
-    const commonAncestor = findCommonAncestor(parentPaths)
 
-    // If the file is part of the predetermined file types, don't add a dot before the file type (e.g. test, config, etc.)
-    // Otherwise, add a dot before the file type as its an extension (e.g. .js, .css, etc.)
-    const fileTypeIsNotAnExtension = fileTypeRules.map((rule) => rule.name)
-    const groupPath = commonAncestor
-      ? `${commonAncestor}/${fileTypeIsNotAnExtension.includes(ext) ? ext : "." + ext}`
-      : `/${fileTypeIsNotAnExtension.includes(ext) ? ext : "." + ext}`
+    // Build children for each subgroup (skip empty)
+    const subgroupChildren: GitTreeObject[] = Object.entries(subGroups)
+      .filter(([_, files]) => files.length > 0)
+      .map(([name, files]) => ({
+        type: "tree",
+        name,
+        path: tree.path + `/${ext}/${name}`,
+        children: files,
+        hash: hashString(files.map((f) => f.hash).join(",")),
+      }))
 
+    // The extension group contains both subgroups and unmatched files directly
     return {
       type: "tree",
-      name: "." +ext,
-      path:  tree.path + "/."+ ext,
-      children: files,
-      hash: hashString(files.map((f) => f.hash).join(","))
+      name: "."+ ext,
+      path: tree.path + `/.${ext}`,
+      children: [...subgroupChildren, ...unmatchedFiles],
+      hash: hashString([
+        ...subgroupChildren.map((c) => c.hash),
+        ...unmatchedFiles.map((f) => f.hash),
+      ].join(",")),
     }
   })
 
@@ -641,6 +641,6 @@ export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
     name: "root-by-filetype",
     path: tree.path,
     children,
-    hash: hashString("root-by-filetype" + children.map((c) => c.hash).join(","))
+    hash: hashString("root-by-filetype" + children.map((c) => c.hash).join(",")),
   }
 }

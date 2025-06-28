@@ -17,12 +17,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const instance = InstanceManager.getInstance(repo, branch)
   if (!instance) return []
-  if (grouping === "FILE_TYPE" && isblob === "false") {
+  if (grouping === "FILE_TYPE" && isblob === "false"){
     const path_adjusted = path.split("/").slice(0, -1).join("/").replace(/^\/+/, "")
     const extension = path.split('.').pop() || "" // Get the file extension
     console.log("path_adjusted", path_adjusted)
     console.log("extension", extension)
-    return await instance.db.getAuthorContribsForFileType(path_adjusted, true, extension)
+    return await instance.db.getAuthorContribsForFileType(path_adjusted, isblob === "true", extension)
   }else{
     console.log("path:", path)
     console.log("grouping:", grouping)
