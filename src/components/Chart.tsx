@@ -415,11 +415,18 @@ function createPartitionedHiearchy(
 ) {
   let currentTree = tree
   const steps = path.substring(tree.name.length + 1).split("/")
-  const extMatch = path.match(/\/\.(\w+)$/)
-  const extension = extMatch ? extMatch[1] : ""
 
-  if (groupingType === "FILE_TYPE" && extension) {
-    currentTree = filterByExtension(currentTree, extension)
+  if (groupingType === "FILE_TYPE") {
+    const file = steps[steps.length - 1]
+    const extension = file.split(".").pop() || ""
+    if (extension !== "") currentTree = filterByExtension(currentTree, extension)
+  }
+
+  if (groupingType === "JSON_RULES") {
+    const file = steps[steps.length - 1]
+    // Element after the #
+    const group = file.split("#").pop() || ""
+    if (group !== "") currentTree = filterByJSON(currentTree, group)
   }
 
   for (let i = 0; i < steps.length; i++) {
@@ -510,10 +517,25 @@ function filterByExtension(node: GitTreeObject, extension: string): GitTreeObjec
         const filtered = filterByExtension(child, extension)
         return filtered.children.length > 0 ? filtered : null
       } else if (child.type === "blob") {
-        const ext = child.name.split(".").pop()
+        let ext = child.name.split(".").pop()
+
+        if (ext === undefined) ext = "no-extension"
+        if (child.name.startsWith(".") && child.name.split(".").length < 3) ext = "dot-files"
+
         return ext === extension ? child : null
       }
       return null
+    })
+    .filter(Boolean) as (GitTreeObject | GitBlobObject)[]
+  return { ...node, children: filteredChildren }
+}
+
+function filterByJSON(node: GitTreeObject, group: string): GitTreeObject {
+  const filteredChildren = node.children
+    .map((child) => {
+      let grp = child.name.split("#").pop()
+      if (grp === undefined) grp = "no-group"
+      return grp === group ? child : null
     })
     .filter(Boolean) as (GitTreeObject | GitBlobObject)[]
   return { ...node, children: filteredChildren }
@@ -571,11 +593,13 @@ function hashString(str: string): string {
 export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
   const blobs = flatten(tree)
   const fileTypeGroups: Record<string, GitBlobObject[]> = {}
-  const longExtFiles: GitBlobObject[] = []
 
-  // 1. Group by extension (max 6 chars)
   for (const file of blobs) {
-    const ext = file.name.split(".").pop() || "unknown"
+    let ext = file.name.split(".").pop()
+
+    if (ext === undefined) ext = "no-extension"
+    if (file.name.startsWith(".") && file.name.split(".").length < 3) ext = "dot-files"
+
     if (!fileTypeGroups[ext]) fileTypeGroups[ext] = []
     fileTypeGroups[ext].push(file)
   }
@@ -584,7 +608,7 @@ export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
     // Create a GitTreeObject for each extension
     return {
       type: "tree",
-      name: ext,
+      name: "." + ext,
       path: tree.path + `/.${ext}`,
       children: files,
       hash: hashString(files.map((f) => f.hash).join(","))
