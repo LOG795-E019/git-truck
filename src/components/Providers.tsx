@@ -120,7 +120,7 @@ export function Providers({ children, data }: ProvidersProps) {
           groupingType
         }))
 
-        // Use Remix's submit function to allow the grouping to
+        // Use Remix's submit function to refresh the page
         const formData = new FormData()
         formData.append("refresh", "true")
         submit(formData, { method: "post", action: window.location.pathname })
@@ -155,6 +155,16 @@ export function Providers({ children, data }: ProvidersProps) {
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           showFilesWithoutChanges: showFilesWithoutChanges
         })),
+      setShowFilesWithNoJSONRules: (showFilesWithNoJSONRules: boolean) => {
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          showFilesWithNoJSONRules: showFilesWithNoJSONRules
+        }))
+
+        const formData = new FormData()
+        formData.append("refresh", "true")
+        submit(formData, { method: "post", action: window.location.pathname })
+      },
       setDominantAuthorCutoff: (dominantAuthorCutoff: number) =>
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
