@@ -35,6 +35,7 @@ import { cn, usePrefersLightMode } from "~/styling"
 import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
 import { createHash } from "crypto"
 import fileTypeRules from "./fileTypeRules.json"
+import { filter } from "compression"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -123,25 +124,19 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
           onMouseOver: () => setHoveredObject(d.data as GitObject),
           onMouseOut: () => setHoveredObject(null)
         }
-      : isTree(d.data)
-        ? {
-            onClick: (evt) => {
-              evt.stopPropagation()
-              setClickedObject(d.data)
-              setPath(d.data.path)
-            },
-            onMouseOver: (evt) => {
-              evt.stopPropagation()
-              if (!isRoot) setHoveredObject(d.data as GitObject)
-              else setHoveredObject(null)
-            },
-            onMouseOut: () => setHoveredObject(null)
-          }
-        : {
-            onClick: () => {},
-            onMouseOver: () => {},
-            onMouseOut: () => {}
-          }
+      : {
+          onClick: (evt) => {
+            evt.stopPropagation()
+            setClickedObject(d.data)
+            setPath(d.data.path)
+          },
+          onMouseOver: (evt) => {
+            evt.stopPropagation()
+            if (!isRoot) setHoveredObject(d.data as GitObject)
+            else setHoveredObject(null)
+          },
+          onMouseOut: () => setHoveredObject(null)
+        }
   }
 
   const now = isChrome || isChromium || isEdgeChromium ? Date.now() : 0 // Necessary in chrome to update text positions
@@ -422,8 +417,8 @@ function createPartitionedHiearchy(
   const steps = path.substring(tree.name.length + 1).split("/")
   const extMatch = path.match(/\/\.(\w+)$/)
   const extension = extMatch ? extMatch[1] : ""
-  console.log("EXTENSION: ", extension)
-  if (groupingType === "FILE_TYPE" && extension !== "") {
+
+  if (groupingType === "FILE_TYPE" && extension) {
     currentTree = filterByExtension(currentTree, extension)
   }
 
@@ -445,7 +440,6 @@ function createPartitionedHiearchy(
   // Grouping By Folder Name
   if (groupingType == "FILE_TYPE") {
     castedTree = fileTypesGrouping(currentTree as GitTreeObject)
-    console.log("Grouping by file type", castedTree)
   }
 
   const hiearchy = hierarchy(castedTree)
@@ -582,74 +576,80 @@ export function fileTypesGrouping(tree: GitTreeObject): GitTreeObject {
   // 1. Group by extension (max 6 chars)
   for (const file of blobs) {
     const ext = file.name.split(".").pop() || "unknown"
-    if (ext.length <= 6) {
-      if (!fileTypeGroups[ext]) fileTypeGroups[ext] = []
-      fileTypeGroups[ext].push(file)
-    } else {
-      longExtFiles.push(file)
-    }
+    if (!fileTypeGroups[ext]) fileTypeGroups[ext] = []
+    fileTypeGroups[ext].push(file)
   }
 
-  // 2. For each extension, group by fileTypeRules patterns
   const children: GitTreeObject[] = Object.entries(fileTypeGroups).map(([ext, files]) => {
-    // Prepare subgroups by pattern name
-    const subGroups: Record<string, GitBlobObject[]> = {}
-    for (const rule of fileTypeRules) {
-      subGroups[rule.name] = []
-    }
-
-    // Assign files to subgroups or mark as unmatched
-    const unmatchedFiles: GitBlobObject[] = []
-    for (const file of files) {
-      let matched = false
-      for (const rule of fileTypeRules) {
-        const regex = new RegExp(rule.pattern, "i")
-        if (regex.test(file.path)) {
-          subGroups[rule.name].push(file)
-          matched = true
-          break
-        }
-      }
-      if (!matched) {
-        unmatchedFiles.push(file)
-      }
-    }
-
-    // Build children for each subgroup (skip empty)
-    const subgroupChildren: GitTreeObject[] = Object.entries(subGroups)
-      .filter(([_, files]) => files.length > 0)
-      .map(([name, files]) => ({
-        type: "tree",
-        name,
-        path: tree.path + `/${ext}/${name}`,
-        children: files,
-        hash: hashString(files.map((f) => f.hash).join(",")),
-      }))
-
-    // The extension group contains both subgroups and unmatched files directly
+    // Create a GitTreeObject for each extension
     return {
       type: "tree",
-      name: "."+ ext,
+      name: ext,
       path: tree.path + `/.${ext}`,
-      children: [...subgroupChildren, ...unmatchedFiles],
-      hash: hashString([
-        ...subgroupChildren.map((c) => c.hash),
-        ...unmatchedFiles.map((f) => f.hash),
-      ].join(",")),
+      children: files,
+      hash: hashString(files.map((f) => f.hash).join(","))
     }
   })
-
-  // Add files with long extensions directly under the root
-  const rootChildren = [
-    ...children,
-    ...longExtFiles
-  ]
 
   return {
     type: "tree",
     name: "root-by-filetype",
     path: tree.path,
-    children: rootChildren,
-    hash: hashString("root-by-filetype" + children.map((c) => c.hash).join(",")),
+    children: children,
+    hash: hashString("root-by-filetype" + children.map((c) => c.hash).join(","))
   }
 }
+
+// export function fileRulesGrouping(tree: GitTreeObject): GitTreeObject {
+//   const blobs = flatten(tree)
+//   const fileTypeGroups: Record<string, GitBlobObject[]> = {}
+//   const longExtFiles: GitBlobObject[] = []
+
+//   // 2. For each extension, group by fileTypeRules patterns
+//   const children: GitTreeObject[] = Object.entries(fileTypeGroups).map(([ext, files]) => {
+//     // Prepare subgroups by pattern name
+//     const subGroups: Record<string, GitBlobObject[]> = {}
+//     for (const rule of fileTypeRules) {
+//       subGroups[rule.name] = []
+//     }
+
+//     // Assign files to subgroups or mark as unmatched
+//     const unmatchedFiles: GitBlobObject[] = []
+//     for (const file of files) {
+//       let matched = false
+//       for (const rule of fileTypeRules) {
+//         const regex = new RegExp(rule.pattern, "i")
+//         if (regex.test(file.path)) {
+//           subGroups[rule.name].push(file)
+//           matched = true
+//           break
+//         }
+//       }
+//       if (!matched) {
+//         unmatchedFiles.push(file)
+//       }
+//     }
+
+//     // Build children for each subgroup (skip empty)
+//     const subgroupChildren: GitTreeObject[] = Object.entries(subGroups)
+//       .filter(([_, files]) => files.length > 0)
+//       .map(([name, files]) => ({
+//         type: "tree",
+//         name,
+//         path: tree.path + `/${ext}/${name}`,
+//         children: files,
+//         hash: hashString(files.map((f) => f.hash).join(","))
+//       }))
+
+//     // The extension group contains both subgroups and unmatched files directly
+//     return {
+//       type: "tree",
+//       name: "." + ext,
+//       path: tree.path + `/.${ext}`,
+//       children: [...subgroupChildren, ...unmatchedFiles],
+//       hash: hashString([...subgroupChildren.map((c) => c.hash), ...unmatchedFiles.map((f) => f.hash)].join(","))
+//     }
+//   })
+
+//   return null
+// }
