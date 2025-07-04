@@ -49,6 +49,7 @@ export type Options = {
   labelsVisible: boolean
   renderCutoff: number
   showFilesWithoutChanges: boolean
+  showFilesWithNoJSONRules: boolean
   dominantAuthorCutoff: number
   linkMetricAndSizeMetric: boolean
 }
@@ -67,6 +68,7 @@ export type OptionsContextType = Options & {
   setCommitSearch: (commitSearch: string) => void
   setRenderCutoff: (renderCutoff: number) => void
   setShowFilesWithoutChanges: (showFilesWithoutChanges: boolean) => void
+  setShowFilesWithNoJSONRules: (showFilesWithNoJSONRules: boolean) => void
   setDominantAuthorCutoff: (dominantAuthorCutoff: number) => void
   setLinkMetricAndSizeMetric: (link: boolean) => void
 }
@@ -97,6 +99,7 @@ const defaultOptions: Options = {
   labelsVisible: true,
   renderCutoff: 2,
   showFilesWithoutChanges: true,
+  showFilesWithNoJSONRules: false,
   dominantAuthorCutoff: 0,
   linkMetricAndSizeMetric: false
 }
@@ -143,6 +146,9 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setShowFilesWithoutChanges: () => {
       throw new Error("No showFilesWithoutChangesSetter provided")
+    },
+    setShowFilesWithNoJSONRules: () => {
+      throw new Error("No showFilesWithNoJSONRulesSetter provided")
     },
     setDominantAuthorCutoff: () => {
       throw new Error("No setDominantAuthorCutoffSetter provided")
