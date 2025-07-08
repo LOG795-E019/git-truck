@@ -27,11 +27,14 @@ import { usePath } from "../contexts/PathContext"
 import { getTextColorFromBackground, isBlob, isTree } from "~/util"
 import clsx from "clsx"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
+import { Grouping, GroupingType } from "~/metrics/grouping"
 import { useSearch } from "~/contexts/SearchContext"
 import type { DatabaseInfo } from "~/routes/$repo.$"
 import ignore, { type Ignore } from "ignore"
 import { cn, usePrefersLightMode } from "~/styling"
 import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
+import { createHash } from "crypto"
+import fileTypeRulesJSON from "./fileTypeRules.json"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -40,11 +43,11 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   const { searchResults } = useSearch()
   const size = useDeferredValue(rawSize)
   const { databaseInfo } = useData()
-  const { chartType, sizeMetric, depthType, hierarchyType, labelsVisible, renderCutoff } = useOptions()
+  const { chartType, sizeMetric, groupingType, depthType, hierarchyType, labelsVisible, renderCutoff } = useOptions()
   const { path } = usePath()
   const { clickedObject, setClickedObject } = useClickedObject()
   const { setPath } = usePath()
-  const { showFilesWithoutChanges } = useOptions()
+  const { showFilesWithoutChanges, showFilesWithNoJSONRules } = useOptions()
 
   let numberOfDepthLevels: number | undefined = undefined
   switch (depthType) {
@@ -95,8 +98,10 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       size,
       chartType,
       sizeMetric,
+      groupingType,
       path,
-      renderCutoff
+      renderCutoff,
+      showFilesWithNoJSONRules
     ).descendants()
     console.timeEnd("nodes")
     return res
@@ -187,7 +192,7 @@ function filterGitTree(
   showFilesWithoutChanges: boolean,
   ig: Ignore
 ): GitTreeObject {
-  function filterNode(node: GitObject): GitObject | null {
+  function filterNode(node: GitTreeObject | GitBlobObject): GitObject | null {
     if (ig.ignores(node.path)) {
       return null
     }
@@ -404,11 +409,14 @@ function createPartitionedHiearchy(
   size: { height: number; width: number },
   chartType: ChartType,
   sizeMetricType: SizeMetricType,
+  groupingType: GroupingType,
   path: string,
-  renderCutoff: number
+  renderCutoff: number,
+  showFilesWithNoJSONRules: boolean
 ) {
   let currentTree = tree
   const steps = path.substring(tree.name.length + 1).split("/")
+
   for (let i = 0; i < steps.length; i++) {
     for (const child of currentTree.children) {
       if (child.type === "tree") {
@@ -422,7 +430,19 @@ function createPartitionedHiearchy(
     }
   }
 
-  const castedTree = currentTree as GitObject
+  if (groupingType === "FILE_TYPE") {
+    const file = steps[steps.length - 1]
+    const extension = file.split(".").pop() || ""
+    currentTree = fileTypesGrouping(currentTree, extension)
+  }
+
+  if (groupingType === "JSON_RULES") {
+    const file = steps[steps.length - 1]
+    const zoomFilter = file.startsWith("#") ? file.substring(1) : ""
+    currentTree = fileJSONRulesGrouping(currentTree, zoomFilter, showFilesWithNoJSONRules)
+  }
+
+  let castedTree = currentTree as GitObject
 
   const hiearchy = hierarchy(castedTree)
     .sum((d) => {
@@ -517,14 +537,137 @@ function roundedRectPathFromRect(x: number, y: number, width: number, height: nu
           z`
 }
 
-function flatten(tree: GitTreeObject) {
-  const flattened: GitBlobObject[] = []
+// Helper to flatten the tree to blobs
+function flatten(tree: GitTreeObject): GitBlobObject[] {
+  let files: GitBlobObject[] = []
   for (const child of tree.children) {
-    if (child.type === "blob") {
-      flattened.push(child)
-    } else {
-      flattened.push(...flatten(child))
+    if (child.type === "tree") {
+      files = files.concat(flatten(child))
+    } else if (child.type === "blob") {
+      files.push(child)
     }
   }
-  return flattened
+  return files
+}
+
+// Helper to hash a string
+function hashString(str: string): string {
+  return createHash("sha1").update(str).digest("hex")
+}
+
+export function fileTypesGrouping(tree: GitTreeObject, zoomFilter: string): GitTreeObject {
+  const blobs = flatten(tree)
+  const fileTypeGroups: Record<string, GitBlobObject[]> = {}
+
+  for (const file of blobs) {
+    if (zoomFilter !== "" && file.path.split(".").pop() !== zoomFilter) continue
+    let ext = file.name.split(".").pop()
+
+    if (ext === undefined) ext = "no-extension"
+    if (file.name.startsWith(".") && file.name.split(".").length < 3) ext = "dot-files"
+
+    if (!fileTypeGroups[ext]) fileTypeGroups[ext] = []
+    fileTypeGroups[ext].push(file)
+  }
+
+  const children: GitTreeObject[] = Object.entries(fileTypeGroups).map(([ext, files]) => {
+    // Create a GitTreeObject for each extension
+    return {
+      type: "tree",
+      name: "." + ext,
+      path: tree.path + `/.${ext}`,
+      children: files,
+      hash: hashString(files.map((f) => f.hash).join(","))
+    }
+  })
+
+  return {
+    type: "tree",
+    name: "root-by-filetype",
+    path: tree.path,
+    children: children,
+    hash: hashString("root-by-filetype" + children.map((c) => c.hash).join(","))
+  }
+}
+
+const fileTypeRules = fileTypeRulesJSON.map((rule) => ({
+  ...rule,
+  regex: new RegExp(rule.pattern, "i")
+}))
+
+export function fileJSONRulesGrouping(
+  tree: GitTreeObject,
+  zoomFilter: string,
+  showFilesWithNoJSONRules: boolean
+): GitTreeObject {
+  const blobs = flatten(tree)
+
+  // Return early when zoomed on a group (no need to check all rules)
+  if (zoomFilter !== "" && zoomFilter !== "ungrouped") {
+    const filteredFiles = blobs.filter((b) => b.path.includes(zoomFilter))
+    return {
+      type: "tree",
+      name: "root-by-json-rules",
+      path: tree.path,
+      children: [
+        {
+          type: "tree",
+          name: zoomFilter,
+          path: tree.path + `/${zoomFilter}`,
+          children: filteredFiles,
+          hash: hashString(filteredFiles.map((f) => f.hash).join(","))
+        }
+      ],
+      hash: hashString("root-by-json-rules" + hashString(filteredFiles.map((f) => f.hash).join(",")))
+    }
+  }
+
+  const jsonGroups: Record<string, GitBlobObject[]> = {}
+  const unmatchedFiles: GitBlobObject[] = []
+
+  // Group blobs by file type rules - optimized with pre-compiled regexes
+  for (const blob of blobs) {
+    let matched = false
+    for (const rule of fileTypeRules) {
+      if (rule.regex.test(blob.path)) {
+        if (zoomFilter !== "ungrouped") {
+          if (!jsonGroups[rule.name]) jsonGroups[rule.name] = []
+          jsonGroups[rule.name].push(blob)
+        }
+        matched = true
+        break
+      }
+    }
+    if (!matched) {
+      unmatchedFiles.push(blob)
+    }
+  }
+
+  // Create the tree
+  const children: GitTreeObject[] = Object.entries(jsonGroups).map(([group, files]) => ({
+    type: "tree",
+    name: "#" + group,
+    path: tree.path + `/#${group}`,
+    children: files,
+    hash: hashString(files.map((f) => f.hash).join(","))
+  }))
+
+  // Add unmatched files as a separate group if requested
+  if (showFilesWithNoJSONRules && unmatchedFiles.length > 0) {
+    children.push({
+      type: "tree",
+      name: "#ungrouped",
+      path: tree.path + "/#ungrouped",
+      children: unmatchedFiles,
+      hash: hashString(unmatchedFiles.map((f) => f.hash).join(","))
+    })
+  }
+
+  return {
+    type: "tree",
+    name: "root-by-json-rules",
+    path: tree.path,
+    children,
+    hash: hashString("root-by-json-rules" + children.map((c) => c.hash).join(","))
+  }
 }

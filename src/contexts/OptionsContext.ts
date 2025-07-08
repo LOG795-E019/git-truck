@@ -3,6 +3,7 @@ import type { MetricType } from "../metrics/metrics"
 import { Metric } from "../metrics/metrics"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
+import { Grouping, type GroupingType } from "~/metrics/grouping"
 import { Depth, type DepthType } from "~/metrics/chartDepth"
 
 export const Chart = {
@@ -43,10 +44,12 @@ export type Options = {
   commitSortingOrdersType: CommitSortingOrdersType
   commitSearch: string
   sizeMetric: SizeMetricType
+  groupingType: GroupingType
   transitionsEnabled: boolean
   labelsVisible: boolean
   renderCutoff: number
   showFilesWithoutChanges: boolean
+  showFilesWithNoJSONRules: boolean
   dominantAuthorCutoff: number
   linkMetricAndSizeMetric: boolean
 }
@@ -55,6 +58,7 @@ export type OptionsContextType = Options & {
   setMetricType: (metricType: MetricType) => void
   setChartType: (chartType: ChartType) => void
   setSizeMetricType: (sizeMetricType: SizeMetricType) => void
+  setGroupingType: (groupingType: GroupingType) => void
   setTransitionsEnabled: (transitionsEnabled: boolean) => void
   setLabelsVisible: (labelsVisible: boolean) => void
   setDepthType: (depthType: DepthType) => void
@@ -64,6 +68,7 @@ export type OptionsContextType = Options & {
   setCommitSearch: (commitSearch: string) => void
   setRenderCutoff: (renderCutoff: number) => void
   setShowFilesWithoutChanges: (showFilesWithoutChanges: boolean) => void
+  setShowFilesWithNoJSONRules: (showFilesWithNoJSONRules: boolean) => void
   setDominantAuthorCutoff: (dominantAuthorCutoff: number) => void
   setLinkMetricAndSizeMetric: (link: boolean) => void
 }
@@ -85,6 +90,7 @@ const defaultOptions: Options = {
   depthType: Object.keys(Depth)[0] as DepthType,
   hierarchyType: Object.keys(Hierarchy)[0] as HierarchyType,
   sizeMetric: Object.keys(SizeMetric)[0] as SizeMetricType,
+  groupingType: Object.keys(Grouping)[0] as GroupingType,
   commitSortingMethodsType: Object.keys(SortingMethods)[0] as CommitSortingMethodsType,
   // The parameter value is based on default sorting method - date (true) or author (false)
   commitSortingOrdersType: Object.keys(SortingOrders(true))[0] as CommitSortingOrdersType,
@@ -93,6 +99,7 @@ const defaultOptions: Options = {
   labelsVisible: true,
   renderCutoff: 2,
   showFilesWithoutChanges: true,
+  showFilesWithNoJSONRules: false,
   dominantAuthorCutoff: 0,
   linkMetricAndSizeMetric: false
 }
@@ -109,6 +116,9 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setSizeMetricType: () => {
       throw new Error("No sizeMetricTypeSetter provided")
+    },
+    setGroupingType: () => {
+      throw new Error("No groupingSetter provided")
     },
     setDepthType: () => {
       throw new Error("No DepthTypeSetter provided")
@@ -136,6 +146,9 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setShowFilesWithoutChanges: () => {
       throw new Error("No showFilesWithoutChangesSetter provided")
+    },
+    setShowFilesWithNoJSONRules: () => {
+      throw new Error("No showFilesWithNoJSONRulesSetter provided")
     },
     setDominantAuthorCutoff: () => {
       throw new Error("No setDominantAuthorCutoffSetter provided")

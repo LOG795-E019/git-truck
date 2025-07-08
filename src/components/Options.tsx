@@ -18,10 +18,15 @@ import {
   mdiPalette,
   mdiImageSizeSelectSmall,
   mdiPuzzle,
-  mdiPlusMinusVariant
+  mdiPlusMinusVariant,
+  mdiFolder,
+  mdiGroup,
+  mdiTextBox
 } from "@mdi/js"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
+import type { GroupingType } from "~/metrics/grouping"
+import { Grouping } from "~/metrics/grouping"
 
 export const relatedSizeMetric: Record<MetricType, SizeMetricType> = {
   FILE_TYPE: "FILE_SIZE",
@@ -32,8 +37,17 @@ export const relatedSizeMetric: Record<MetricType, SizeMetricType> = {
 }
 
 export const Options = memo(function Options() {
-  const { metricType, chartType, sizeMetric, linkMetricAndSizeMetric, setMetricType, setChartType, setSizeMetricType } =
-    useOptions()
+  const {
+    metricType,
+    chartType,
+    sizeMetric,
+    linkMetricAndSizeMetric,
+    groupingType,
+    setMetricType,
+    setChartType,
+    setSizeMetricType,
+    setGroupingType
+  } = useOptions()
 
   const visualizationIcons: Record<MetricType, string> = {
     FILE_TYPE: mdiFileCodeOutline,
@@ -49,6 +63,12 @@ export const Options = memo(function Options() {
     MOST_COMMITS: mdiSourceCommit,
     LAST_CHANGED: mdiUpdate,
     MOST_CONTRIBS: mdiPlusMinusVariant
+  }
+
+  const groupingTypeIcons: Record<GroupingType, string> = {
+    FILE_TYPE: mdiFileCodeOutline,
+    FOLDER_NAME: mdiFolder,
+    JSON_RULES: mdiTextBox
   }
 
   const chartTypeIcons: Record<ChartType, string> = {
@@ -102,6 +122,18 @@ export const Options = memo(function Options() {
               }
             }}
             iconMap={visualizationIcons}
+          />
+        </fieldset>
+        <fieldset className="rounded-lg border p-2">
+          <legend className="card__title ml-1.5 justify-start gap-2">
+            <Icon path={mdiGroup} size="1.25em" />
+            Grouping
+          </legend>
+          <EnumSelect
+            enum={Grouping}
+            defaultValue={groupingType}
+            onChange={(groupingType: GroupingType) => setGroupingType(groupingType)}
+            iconMap={groupingTypeIcons}
           />
         </fieldset>
       </div>

@@ -1,0 +1,34 @@
+@startuml
+actor User
+participant "UI (DetailsCard)" as UI
+participant "AuthorDistFragment" as Fragment
+participant "Backend Route" as Backend
+participant "DB" as DB
+
+User -> UI : Selects a file/folder
+UI -> UI : Detects selected metricType (percentage, commits, line changes)
+
+alt metricType == "percentage"
+    UI -> Fragment : renderAuthorDistribution(type="percentage")
+    Fragment -> Backend : fetchAuthorPercentage(path)
+    Backend -> DB : getAuthorContribsForPath(path)
+    DB --> Backend : author, contribs (line changes)
+    Backend --> Fragment : author, contribs (percentage calculated)
+    Fragment -> UI : Display author % distribution
+else metricType == "commits"
+    UI -> Fragment : renderAuthorDistribution(type="commits")
+    Fragment -> Backend : fetchAuthorCommits(path)
+    Backend -> DB : getAuthorCommitsForPath(path)
+    DB --> Backend : author, commitCount
+    Backend --> Fragment : author, commitCount
+    Fragment -> UI : Display author commit count distribution
+else metricType == "line changes"
+    UI -> Fragment : renderAuthorDistribution(type="line changes")
+    Fragment -> Backend : fetchAuthorLineChanges(path)
+    Backend -> DB : getAuthorLineChangesForPath(path)
+    DB --> Backend : author, lineChanges
+    Backend --> Fragment : author, lineChanges
+    Fragment -> UI : Display author line changes distribution
+end
+
+@enduml

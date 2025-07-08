@@ -337,8 +337,23 @@ export default class DB {
 
   public async getCommitCountForPath(path: string) {
     const res = await this.query(`
-      SELECT COUNT(DISTINCT commithash) AS count from filechanges_commits_renamed_cached WHERE filepath GLOB '${path}*';
+      SELECT COUNT(DISTINCT commithash) AS count 
+      from filechanges_commits_renamed_cached 
+      WHERE filepath GLOB '${path}*';
     `)
+    return Number(res[0]["count"])
+  }
+
+  public async getCommitCountForFileType(path: string, fileType: string) {
+    // fileType should include the dot, e.g. ".tsx"
+    if (!fileType.startsWith(".")) fileType = "." + fileType;
+    console.log("getCommitCountForFileType", path, fileType)
+    const res = await this.query(`
+      SELECT COUNT(DISTINCT commithash) AS count
+      FROM filechanges_commits_renamed_cached
+      WHERE filepath GLOB '${path}*' AND filepath LIKE '%${fileType}';
+    `)
+    console.log("getCommitCountForFileType result", res)
     return Number(res[0]["count"])
   }
 
@@ -532,6 +547,28 @@ export default class DB {
     return res.map((row) => {
       return { author: row["author"] as string, contribs: Number(row["contribsum"]) }
     })
+  }
+
+  public async getAuthorContribsForFileType(path: string, isblob: boolean, fileType: string) {
+    // Ensure fileType starts with a dot
+    if (!fileType.startsWith(".")) fileType = "." + fileType;
+    // For blobs, match the exact file; for trees, match all files under the path with the extension
+    const condition = isblob
+      ? `filepath = '${path}' AND filepath LIKE '%${fileType}'`
+      : `filepath GLOB '${path}*' AND filepath LIKE '%${fileType}'`;
+
+    const res = await this.query(`
+      SELECT author, SUM(insertions + deletions) AS contribsum
+      FROM filechanges_commits_renamed_cached
+      WHERE ${condition}
+      GROUP BY author
+      ORDER BY contribsum DESC, author ASC;
+    `);
+
+    return res.map((row) => ({
+      author: row["author"] as string,
+      contribs: Number(row["contribsum"])
+    }));
   }
 
   private getTimeStringFormat(timerange: [number, number]) {
