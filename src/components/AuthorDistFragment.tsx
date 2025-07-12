@@ -6,12 +6,14 @@ interface AuthorDistFragProps {
   items: { author: string; contribs: number }[]
   show: boolean
   contribSum: number
+  showPercent?: boolean
 }
 
 export function AuthorDistFragment(props: AuthorDistFragProps) {
   const [, authorColors] = useMetrics()
 
   if (!props.show) return null
+  
 
   return (
     <>
@@ -20,18 +22,36 @@ export function AuthorDistFragment(props: AuthorDistFragProps) {
         const author = legendItem.author
         const roundedContrib = Math.round((contrib / props.contribSum) * 100)
         const contribPercentage = roundedContrib === 0 ? "<1" : roundedContrib
-        return (
-          <Fragment key={author + contrib}>
-            <div
-              className="flex items-center gap-2 overflow-hidden overflow-ellipsis whitespace-pre text-sm font-semibold"
-              title={author}
-            >
-              <LegendDot authorColorToChange={author} className="ml-1" dotColor={authorColors.get(author) ?? "grey"} />
-              <span className="overflow-hidden overflow-ellipsis whitespace-pre font-bold opacity-80">{author}</span>
-            </div>
-            <p className="break-all text-right text-sm">{contribPercentage}%</p>
-          </Fragment>
-        )
+        if (props.showPercent === true){
+          return (
+            <Fragment key={author + contrib}>
+              <div
+                className="flex items-center gap-2 overflow-hidden overflow-ellipsis whitespace-pre text-sm font-semibold"
+                title={author}
+              >
+                <LegendDot authorColorToChange={author} className="ml-1" dotColor={authorColors.get(author) ?? "grey"} />
+                <span className="overflow-hidden overflow-ellipsis whitespace-pre font-bold opacity-80">{author}</span>
+              </div>
+              <p className="break-all text-right text-sm">{contribPercentage}%</p>
+            </Fragment>
+          )
+        }else{
+          return (
+            <Fragment key={author + contrib}>
+              <div
+                className="flex items-center gap-2 overflow-hidden overflow-ellipsis whitespace-pre text-sm font-semibold"
+                title={author}
+              >
+                <LegendDot authorColorToChange={author} className="ml-1" dotColor={authorColors.get(author) ?? "grey"} />
+                <span className="overflow-hidden overflow-ellipsis whitespace-pre font-bold opacity-80">{author}</span>
+              </div>
+              <p className="break-all text-right text-sm">{contrib}</p>
+            </Fragment>
+          )
+        }
+        
+        
+        
       })}
     </>
   )

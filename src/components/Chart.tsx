@@ -841,7 +841,7 @@ export function fileJSONRulesGrouping(
 function createAuthorNetworkHierarchy(
   databaseInfo: DatabaseInfo,
   tree: GitTreeObject,
-  context: "MOST_COMMITS" | "MOST_CONTRIBS" = "MOST_COMMITS"
+  context: string
 ): HierarchyNode<GitObject> {
   const fixedAuthorSize = 1000
 
