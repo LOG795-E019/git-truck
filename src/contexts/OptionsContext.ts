@@ -7,8 +7,9 @@ import { Grouping, type GroupingType } from "~/metrics/grouping"
 import { Depth, type DepthType } from "~/metrics/chartDepth"
 
 export const Chart = {
-  BUBBLE_CHART: "Bubble chart",
-  TREE_MAP: "Tree map"
+  BUBBLE_CHART: "Bubble Chart",
+  TREE_MAP: "Tree Map",
+  AUTHOR_GRAPH: "Author Graph"
 } as const
 
 export type ChartType = keyof typeof Chart

@@ -46,6 +46,8 @@ export interface RepoData {
 
 export interface DatabaseInfo {
   dominantAuthors: Record<string, { author: string; contribcount: number }>
+  authorsFilesStats: Record<string, Record<string, { nb_commits: number; nb_line_change: number }>>
+  authorsTotalStats: Record<string, { nb_commits: number; nb_line_change: number }>
   commitCounts: Record<string, number>
   lastChanged: Record<string, number>
   authorCounts: Record<string, number>
@@ -274,6 +276,8 @@ async function analyze(params: Params) {
   if (!prevRes || shouldUpdate(reason, "cache")) await instance.db.updateCachedResult()
   console.timeEnd("updateCache")
   console.time("dbQueries")
+  const authorsTotalStats = await instance.db.getAuthorsTotalStats();
+  const authorsFilesStats = await instance.db.getAuthorsFileStats();
   const dominantAuthors =
     prevRes && !shouldUpdate(reason, "dominantAuthor")
       ? prevRes.dominantAuthors
@@ -329,6 +333,8 @@ async function analyze(params: Params) {
 
   const databaseInfo: DatabaseInfo = {
     dominantAuthors,
+    authorsFilesStats,
+    authorsTotalStats,
     commitCounts,
     lastChanged,
     authorCounts,

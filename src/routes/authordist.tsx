@@ -14,6 +14,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   invariant(path, "path is required")
   invariant(isblob, "isblob is required")
   invariant(grouping, "grouping is required")
+  console.log(url)
 
   const instance = InstanceManager.getInstance(repo, branch)
   if (!instance) return []
@@ -22,11 +23,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const extension = path.split('.').pop() || "" // Get the file extension
     console.log("path_adjusted", path_adjusted)
     console.log("extension", extension)
-    return await instance.db.getAuthorContribsForFileType(path_adjusted, isblob === "true", extension)
-  }else{
+    return await instance.db.getAuthorContribsForExtension(path_adjusted, extension)
+  }
+  else if(grouping === "JSON_RULES" && isblob === "false"){
+    const path_adjusted = path.split("/").slice(0, -1).join("/").replace(/^\/+/, "")
+    const keyword = path.split('#').pop() || "" // Get the file extension
+    console.log("path_adjusted", path_adjusted)
+    console.log("extension", keyword)
+    return await instance.db.getAuthorContribsForKeyword(path_adjusted, keyword)
+  }
+  else{
     console.log("path:", path)
     console.log("grouping:", grouping)
-    return await instance.db.getAuthorContribsForPath(path, isblob === "true")
+    const response = await instance.db.getAuthorContribsForPath(path, isblob === "true")
+    console.log("response:", response)
+    return response
   }
   
 }

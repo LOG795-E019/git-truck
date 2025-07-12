@@ -549,13 +549,11 @@ export default class DB {
     })
   }
 
-  public async getAuthorContribsForFileType(path: string, isblob: boolean, fileType: string) {
-    // Ensure fileType starts with a dot
-    if (!fileType.startsWith(".")) fileType = "." + fileType;
-    // For blobs, match the exact file; for trees, match all files under the path with the extension
-    const condition = isblob
-      ? `filepath = '${path}' AND filepath LIKE '%${fileType}'`
-      : `filepath GLOB '${path}*' AND filepath LIKE '%${fileType}'`;
+  public async getAuthorContribsForExtension(path: string, extension: string) {
+    // Ensure extension starts with a dot
+    if (!extension.startsWith(".")) extension = "." + extension;
+    // Match all files under the path with the given extension
+    const condition = `filepath GLOB '${path}*' AND filepath LIKE '%${extension}'`;
 
     const res = await this.query(`
       SELECT author, SUM(insertions + deletions) AS contribsum
@@ -569,6 +567,82 @@ export default class DB {
       author: row["author"] as string,
       contribs: Number(row["contribsum"])
     }));
+  }
+
+  public async getAuthorContribsForKeyword(path: string, extension: string) {
+    // Remove any leading dot from extension if present
+    const cleanExtension = extension.startsWith(".") ? extension.substring(1) : extension;
+    // Build the condition to match files under the path containing the extension/keyword
+    const condition = `filepath GLOB '${path}*' AND filepath LIKE '%${cleanExtension}%'`;
+
+    const res = await this.query(`
+      SELECT author, SUM(insertions + deletions) AS contribsum
+      FROM filechanges_commits_renamed_cached
+      WHERE ${condition}
+      GROUP BY author
+      ORDER BY contribsum DESC, author ASC;
+    `);
+
+    return res.map((row) => ({
+      author: row["author"] as string,
+      contribs: Number(row["contribsum"])
+    }));
+  }
+
+  public async getAuthorsFileStats(): Promise<Record<string, Record<string, { nb_commits: number; nb_line_change: number }>>> {
+    const res = await this.query(`
+      SELECT author, filepath,
+            COUNT(DISTINCT commithash) AS nb_commits,
+            SUM(insertions + deletions) AS nb_line_change
+      FROM filechanges_commits_renamed_cached
+      GROUP BY author, filepath
+      ORDER BY author ASC, filepath ASC;
+    `);
+
+    const result: Record<string, Record<string, { nb_commits: number; nb_line_change: number }>> = {};
+
+    res.forEach((row) => {
+      const author = row["author"] as string;
+      const filepath = row["filepath"] as string;
+      const nb_commits = Number(row["nb_commits"]);
+      const nb_line_change = Number(row["nb_line_change"]);
+
+      if (!result[author]) result[author] = {};
+      result[author][filepath] = { nb_commits, nb_line_change };
+    });
+
+    return result;
+  }
+
+  public async getAuthorsTotalStats(): Promise<Record<string, { nb_commits: number; nb_line_change: number }>> {
+    const commitRes = await this.query(`
+      SELECT author, commithash, SUM(insertions + deletions) AS nb_line_change
+      FROM filechanges_commits_renamed_cached
+      GROUP BY author, commithash
+    `);
+
+    const authorCommits: Record<string, Set<string>> = {};
+    const authorLineChange: Record<string, number> = {};
+
+    commitRes.forEach((row) => {
+      const author = row["author"] as string;
+      const commithash = row["commithash"] as string;
+      const nb_line_change = Number(row["nb_line_change"]);
+      if (!authorCommits[author]) authorCommits[author] = new Set();
+      if (!authorLineChange[author]) authorLineChange[author] = 0;
+      authorCommits[author].add(commithash);
+      authorLineChange[author] += nb_line_change;
+    });
+
+    const result: Record<string, { nb_commits: number; nb_line_change: number }> = {};
+    Object.keys(authorCommits).forEach((author) => {
+      result[author] = {
+        nb_commits: authorCommits[author].size,
+        nb_line_change: authorLineChange[author]
+      };
+    });
+
+    return result;
   }
 
   private getTimeStringFormat(timerange: [number, number]) {

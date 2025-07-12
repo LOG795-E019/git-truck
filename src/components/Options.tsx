@@ -9,6 +9,7 @@ import { memo } from "react"
 import {
   mdiChartBubble,
   mdiChartTree,
+  mdiAccountNetwork,
   mdiPodiumGold,
   mdiFileCodeOutline,
   mdiUpdate,
@@ -73,7 +74,8 @@ export const Options = memo(function Options() {
 
   const chartTypeIcons: Record<ChartType, string> = {
     BUBBLE_CHART: mdiChartBubble,
-    TREE_MAP: mdiChartTree
+    TREE_MAP: mdiChartTree,
+    AUTHOR_GRAPH: mdiAccountNetwork
   }
 
   return (
