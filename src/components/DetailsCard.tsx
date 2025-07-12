@@ -3,6 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { type Fetcher, Form, useFetcher, useLocation, useNavigation } from "@remix-run/react"
 import type { GitObject, GitTreeObject } from "~/analyzer/model"
 import { AuthorDistFragment } from "~/components/AuthorDistFragment"
+import { FileDistributionFragment } from "~/components/FileDistributionFragment"
 import { ChevronButton } from "~/components/ChevronButton"
 import { CloseButton } from "~/components/util"
 import { useClickedObject } from "~/contexts/ClickedContext"
@@ -44,6 +45,7 @@ export function DetailsCard({
   const [commitCount, setCommitCount] = useState<number | null>(null)
   const slicedPath = useMemo(() => clickedObject?.path ?? "", [clickedObject])
   const [showPercent, setShowPercent] = useState<boolean>(false)
+  const [, authorColors] = useMetrics(); 
 
   const existingCommitCount = databaseInfo.commitCounts[slicedPath]
 
@@ -139,9 +141,71 @@ export function DetailsCard({
   const isBlob = clickedObject.type === "blob"
   const extension = last(clickedObject.name.split("."))
   // TODO: handle binary file properly or remove the entry
-  if (chartType === "AUTHOR_GRAPH"){
-    console.log("Author graph is not supported for blobs")
-  }else {
+  if (chartType === "AUTHOR_GRAPH") {
+  if (!clickedObject || !clickedObject.path.includes("/@")) return null;
+
+  const authorName = clickedObject.name;
+  const stats = databaseInfo.authorsTotalStats[authorName];
+  const color = authorColors.get(authorName) ?? "#ccc";
+
+  return (
+    <div
+      className={clsx(className, "card flex flex-col gap-2 transition-colors", {
+        "text-gray-100": !lightBackground,
+        "text-gray-800": lightBackground
+      })}
+      style={{ backgroundColor: color }}
+    >
+      <div className="flex">
+        <h2 className="card__title grid w-full grid-cols-[auto,1fr,auto] gap-2">
+          <Icon path={mdiAccountMultiple} size="1.25em" />
+          <span className="truncate" title={authorName}>
+            {authorName}
+          </span>
+          <CloseButton absolute={false} onClick={() => setClickedObject(null)} />
+        </h2>
+      </div>
+      <MenuTab>
+        <MenuItem title="General">
+          <div className="flex grow flex-col gap-2">
+            <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1">
+              <div className="flex grow items-center overflow-hidden overflow-ellipsis whitespace-pre text-sm font-semibold">
+                Commits
+              </div>
+              <p className="break-all text-sm">{stats?.nb_commits ?? 0}</p>
+              <div className="flex grow items-center overflow-hidden overflow-ellipsis whitespace-pre text-sm font-semibold">
+                Line changes
+              </div>
+              <p className="break-all text-sm">{stats?.nb_line_change ?? 0}</p>
+            </div>
+            <div className="card bg-white/70 text-black">
+              <div className="flex gap-2 mb-2">
+                <button
+                  className={`btn btn-xs ${showPercent ? "btn--primary" : ""}`}
+                  onClick={() => setShowPercent(true)}
+                >
+                  Percentages
+                </button>
+                <button
+                  className={`btn btn-xs ${!showPercent ? "btn--primary" : ""}`}
+                  onClick={() => setShowPercent(false)}
+                >
+                  Raw Numbers
+                </button>
+              </div>
+              <FileDistributionFragment
+                author={authorName}
+                showPercent={showPercent}
+                show={true}
+                sizeMetric={sizeMetric}
+              />
+            </div>
+          </div>
+        </MenuItem>
+      </MenuTab>
+    </div>
+  );
+}else {
     return (
         <div
           className={clsx(className, "card flex flex-col gap-2 transition-colors", {
