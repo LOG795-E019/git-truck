@@ -179,8 +179,6 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
               const pos1 = nodePositions[author1];
               const pos2 = nodePositions[author2];
               if (!pos1 || !pos2) return [];
-              console.log(`Drawing relationship between ${author1} and ${author2}`);
-              console.log("Rel Data: ", relData)
               const searched_Stat = sizeMetric === "MOST_CONTRIBS" ? "nb_line_change" : "nb_commits";
               const author1Value = relData.author1Contribs[searched_Stat];
               const author2Value = relData.author2Contribs[searched_Stat];
@@ -904,9 +902,13 @@ export function getAuthorsRelationships(
   const authorsFileStats = databaseInfo.authorsFilesStats;
   const authors = Object.keys(authorsFileStats);
 
+  // Initialize all authors first
+  for (const author of authors) {
+    if (!relationshipMap[author]) relationshipMap[author] = { Relationships: {} };
+  }
+
   for (let i = 0; i < authors.length; i++) {
     const author1 = authors[i];
-    relationshipMap[author1] = { Relationships: {} };
 
     for (let j = i + 1; j < authors.length; j++) {
       const author2 = authors[j];
@@ -914,12 +916,10 @@ export function getAuthorsRelationships(
       // Find common files
       const files1 = Object.keys(authorsFileStats[author1]);
       const files2 = Object.keys(authorsFileStats[author2]);
-      // Only count files where line change is at least 20% of the other author
       const commonFiles = files1.filter(f => {
         if (!files2.includes(f)) return false;
         const lc1 = authorsFileStats[author1][f].nb_line_change;
         const lc2 = authorsFileStats[author2][f].nb_line_change;
-        // Both must have at least 20% of the other's line change
         return (
           (lc1 >= 0.2 * lc2 && lc2 > 0) ||
           (lc2 >= 0.2 * lc1 && lc1 > 0)
@@ -927,7 +927,7 @@ export function getAuthorsRelationships(
       });
 
       if (commonFiles.length > 0) {
-        relationshipMap[author1].Relationships[author2] = {
+        const relData = {
           commonFiles,
           author1Contribs: commonFiles.reduce((acc, file) => ({
             nb_commits: acc.nb_commits + authorsFileStats[author1][file].nb_commits,
@@ -937,6 +937,12 @@ export function getAuthorsRelationships(
             nb_commits: acc.nb_commits + authorsFileStats[author2][file].nb_commits,
             nb_line_change: acc.nb_line_change + authorsFileStats[author2][file].nb_line_change
           }), { nb_commits: 0, nb_line_change: 0 })
+        };
+        relationshipMap[author1].Relationships[author2] = relData;
+        relationshipMap[author2].Relationships[author1] = {
+          commonFiles,
+          author1Contribs: relData.author2Contribs,
+          author2Contribs: relData.author1Contribs
         };
       }
     }

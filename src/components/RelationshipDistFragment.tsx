@@ -15,8 +15,9 @@ export function RelationshipDistFragment(props: RelationshipDistFragProps) {
   const authorsRelationships = getAuthorsRelationships(databaseInfo)
   // Correct way to access relationships for the author:
   const authorRelationships = authorsRelationships[props.author]?.Relationships || {}
+  console.log(authorRelationships)
 
-  if (!props.show) return null
+  if (!props.show || Object.keys(authorRelationships).length === 0) return null
 
   // Choose metric
   const searched_Stat = props.sizeMetric === "MOST_CONTRIBS" ? "nb_line_change" : "nb_commits"
