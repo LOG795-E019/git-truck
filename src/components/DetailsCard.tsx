@@ -20,6 +20,12 @@ import { MenuItem, MenuTab } from "./MenuTab"
 import { CommitsCard } from "./CommitsCard"
 import { usePrefersLightMode } from "~/styling"
 
+export interface AuthorContributionData {
+  author: string;
+  contribs: number;
+  commitsOnPath?: number;
+}
+
 function OneFolderOut(path: string) {
   const index = path.lastIndexOf("/")
   const index2 = path.lastIndexOf("\\")
@@ -78,7 +84,7 @@ export function DetailsCard({
     }
   }, [commitFetcher])
 
-  const [authorContributions, setAuthorContributions] = useState<{ author: string; contribs: number }[] | null>(null)
+  const [authorContributions, setAuthorContributions] = useState<AuthorContributionData[] | null>(null)
   const contribSum = useMemo(() => {
     if (!authorContributions) return 0
     return authorContributions.reduce((acc, curr) => acc + curr.contribs, 0)
@@ -100,7 +106,7 @@ export function DetailsCard({
 
   useEffect(() => {
     if (fetcher.state === "idle") {
-      const data = (fetcher.data ?? []) as { author: string; contribs: number }[]
+      const data = (fetcher.data ?? []) as AuthorContributionData[]
       setAuthorContributions(data)
     }
   }, [fetcher])
@@ -446,7 +452,7 @@ function SizeEntry(props: { size: number; isBinary?: boolean }) {
 const authorCutoff = 2
 
 function AuthorDistribution(props: {
-  authors: { author: string; contribs: number }[] | null
+  authors: AuthorContributionData[] | null
   contribSum: number
   fetcher: Fetcher
   showPercent: boolean
@@ -466,7 +472,8 @@ function AuthorDistribution(props: {
           <ChevronButton id={authorDistributionExpandId} open={!collapsed} onClick={() => setCollapsed(!collapsed)} />
         ) : null}
       </div>
-      <div className="grid grid-cols-[1fr,auto] gap-1">
+      {}
+      <div className="flex flex-col gap-2">
         {props.fetcher.state !== "idle" ? (
           <p>Loading authors...</p>
         ) : (
@@ -510,7 +517,7 @@ function AuthorDistribution(props: {
   )
 }
 
-function hasContributions(authors?: { author: string; contribs: number }[] | null) {
+function hasContributions(authors?: AuthorContributionData[] | null) {
   if (!authors) return false
   for (const { contribs } of authors) {
     if (contribs > 0) return true

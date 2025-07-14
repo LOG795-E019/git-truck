@@ -635,6 +635,25 @@ export default class DB {
     }));
   }
 
+  // --- NEW METHOD TO GET COMMITS AND LINE CHANGES FOR A SPECIFIC AUTHOR ON A SPECIFIC PATH ---
+  public async getAuthorCommitsAndLinesForPath(author: string, path: string, isBlob: boolean): Promise<{ commits: number } | null> {
+    const queryCondition = isBlob ? `filepath = '${path}'` : `filepath GLOB '${path}*'`;
+    const res = await this.query(`
+      SELECT
+        COUNT(DISTINCT commithash) AS nb_commits,
+      FROM filechanges_commits_renamed_cached
+      WHERE author = '${author}' AND ${queryCondition};
+    `);
+
+    if (res.length > 0) {
+      return {
+        commits: Number(res[0]["nb_commits"])
+      };
+    }
+    return null; // Return null if no data found for this author on this path
+  }
+  // --- END NEW METHOD ---
+
   public async getAuthorsFileStats(): Promise<Record<string, Record<string, { nb_commits: number; nb_line_change: number }>>> {
     const res = await this.query(`
       SELECT author, filepath,
