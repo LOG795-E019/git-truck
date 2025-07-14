@@ -892,7 +892,7 @@ function createAuthorNetworkHierarchy(
   return hierarchy(authorNetworkRoot as GitObject)
 }
 
-function getAuthorsRelationships(
+export function getAuthorsRelationships(
   databaseInfo: DatabaseInfo,
 ) {
   const relationshipMap: Record<string, { Relationships: Record<string, { 

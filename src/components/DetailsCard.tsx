@@ -4,6 +4,7 @@ import { type Fetcher, Form, useFetcher, useLocation, useNavigation } from "@rem
 import type { GitObject, GitTreeObject } from "~/analyzer/model"
 import { AuthorDistFragment } from "~/components/AuthorDistFragment"
 import { FileDistributionFragment } from "~/components/FileDistributionFragment"
+import { RelationshipDistFragment } from "~/components/RelationshipDistFragment"
 import { ChevronButton } from "~/components/ChevronButton"
 import { CloseButton } from "~/components/util"
 import { useClickedObject } from "~/contexts/ClickedContext"
@@ -147,6 +148,10 @@ export function DetailsCard({
   const authorName = clickedObject.name;
   const stats = databaseInfo.authorsTotalStats[authorName];
   const color = authorColors.get(authorName) ?? "#ccc";
+  let metricString = "Nb Lines Changed";
+  if (sizeMetric === "MOST_COMMITS") {
+    metricString = "Nb Commits";
+  }
 
   return (
     <div
@@ -193,10 +198,35 @@ export function DetailsCard({
                   Raw Numbers
                 </button>
               </div>
+                <h3 className="font-bold">File Distribution for {metricString}</h3>
               <FileDistributionFragment
                 author={authorName}
                 showPercent={showPercent}
                 show={true}
+                sizeMetric={sizeMetric}
+              />
+              
+            </div>
+            <div className="card bg-white/70 text-black">
+              <div className="flex gap-2 mb-2">
+                <button
+                  className={`btn btn-xs ${showPercent ? "btn--primary" : ""}`}
+                  onClick={() => setShowPercent(true)}
+                >
+                  Percentages
+                </button>
+                <button
+                  className={`btn btn-xs ${!showPercent ? "btn--primary" : ""}`}
+                  onClick={() => setShowPercent(false)}
+                >
+                  Raw Numbers
+                </button>
+              </div>
+                <h3 className="font-bold">Relationship Distribution with {metricString}</h3>
+              <RelationshipDistFragment
+                author={authorName}
+                show={true}
+                showPercent={showPercent}
                 sizeMetric={sizeMetric}
               />
             </div>
@@ -259,7 +289,7 @@ export function DetailsCard({
                       Raw Numbers
                     </button>
                   </div>
-                  <AuthorDistribution authors={authorContributions} contribSum={contribSum}  fetcher={fetcher} showPercent={showPercent}/>
+                  <AuthorDistribution authors={authorContributions} contribSum={contribSum}  fetcher={fetcher} showPercent={showPercent} size_metric= {sizeMetric}/>
                 </div>
               </div>
               <div className="mt-2 flex gap-2">
@@ -450,17 +480,21 @@ function AuthorDistribution(props: {
   contribSum: number
   fetcher: Fetcher
   showPercent: boolean
+  size_metric: string
 }) {
   const authorDistributionExpandId = useId()
 
   const [collapsed, setCollapsed] = useState<boolean>(true)
-
+  let metricString = "Nb Lines Changed"
+  if (props.size_metric === "MOST_COMMITS") {
+    metricString = "Nb Commits"
+  }
   const authorsAreCutoff = (props.authors?.length ?? 0) > authorCutoff + 1
   return (
     <div className="flex flex-col gap-2">
       <div className={`flex justify-between ${authorsAreCutoff ? "cursor-pointer hover:opacity-70" : ""}`}>
         <label className="label grow" htmlFor={authorDistributionExpandId}>
-          <h3 className="font-bold">Author distribution</h3>
+          <h3 className="font-bold">Author distribution for {metricString}</h3>
         </label>
         {authorsAreCutoff ? (
           <ChevronButton id={authorDistributionExpandId} open={!collapsed} onClick={() => setCollapsed(!collapsed)} />
