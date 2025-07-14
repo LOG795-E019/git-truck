@@ -34,7 +34,7 @@ export function RelationshipDistFragment(props: RelationshipDistFragProps) {
     <div className="grid grid-cols-[1fr,auto,auto] gap-1">
       <div className="font-semibold">Co-author</div>
       <div className="font-semibold text-right">Current Author{}</div>
-      <div className="font-semibold text-right">Collegue</div>
+      <div className="font-semibold text-right">Co-Author</div>
       {entries.map(([author2, relData]) => {
         const author1Value = relData.author1Contribs[searched_Stat] ?? 0
         const author2Value = relData.author2Contribs[searched_Stat] ?? 0
