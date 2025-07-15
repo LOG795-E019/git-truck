@@ -568,6 +568,15 @@ function createPartitionedHiearchy(
     currentTree = fileJSONRulesGrouping(currentTree, zoomFilter, showFilesWithNoJSONRules)
   }
 
+  if (groupingType === "AUTHOR_FILES") {
+    // Extract author filter from path for AUTHOR_FILES grouping
+    let authorFilter = ""
+    if (path.includes("/@")) {
+      authorFilter = path.split("/@")[1] || ""
+    }
+    currentTree = createAuthorFileHierarchy(databaseInfo, currentTree, sizeMetricType, authorFilter)
+  }
+
   let castedTree = currentTree as GitObject
 
   const hiearchy = hierarchy(castedTree)
@@ -833,6 +842,69 @@ export function fileJSONRulesGrouping(
     path: tree.path,
     children,
     hash: hashString("root-by-json-rules" + children.map((c) => c.hash).join(","))
+  }
+}
+
+function createAuthorFileHierarchy(
+  databaseInfo: DatabaseInfo,
+  tree: GitTreeObject,
+  context: string,
+  authorFilter: string
+): GitTreeObject {
+  const blobs = flatten(tree)
+  const searched_Stat = context === "MOST_CONTRIBS" ? "nb_line_change" : "nb_commits"
+  const authorFileGroups: Record<string, GitBlobObject[]> = {}
+
+  // Group files by their top contributing author
+  for (const file of blobs) {
+    const filePath = file.path
+    let topAuthor = "unknown"
+    let maxContrib = 0
+
+    // Find the author with the highest contribution to this file
+    for (const [author, authorFiles] of Object.entries(databaseInfo.authorsFilesStats)) {
+      if (authorFiles[filePath]) {
+        const contrib = authorFiles[filePath][searched_Stat] || 0
+        if (contrib > maxContrib) {
+          maxContrib = contrib
+          topAuthor = author
+        }
+      }
+    }
+
+    // Filter by author if authorFilter is provided (like zoomFilter in fileTypesGrouping)
+    if (authorFilter !== "" && topAuthor !== authorFilter) continue
+
+    // Add file to the top author's group
+    if (!authorFileGroups[topAuthor]) authorFileGroups[topAuthor] = []
+    authorFileGroups[topAuthor].push(file)
+  }
+
+  // Create GitTreeObject for each author containing their files
+  const children: GitTreeObject[] = Object.entries(authorFileGroups).map(([author, files]) => {
+    // Sort files by contribution (highest first) and take top 5
+    const sortedFiles = files
+      .map(file => ({
+        ...file,
+        authorContrib: databaseInfo.authorsFilesStats[author]?.[file.path]?.[searched_Stat] || 0
+      }))
+      .sort((a, b) => b.authorContrib - a.authorContrib)
+
+    return {
+      type: "tree",
+      name: author,
+      path: tree.path + `/@${author}`,
+      children: sortedFiles,
+      hash: hashString(author + files.map((f) => f.hash).join(","))
+    }
+  })
+
+  return {
+    type: "tree",
+    name: "root-by-author",
+    path: tree.path,
+    children,
+    hash: hashString("root-by-author" + children.map((c) => c.hash).join(","))
   }
 }
 

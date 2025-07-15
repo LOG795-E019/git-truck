@@ -142,8 +142,7 @@ export function DetailsCard({
   const isBlob = clickedObject.type === "blob"
   const extension = last(clickedObject.name.split("."))
   // TODO: handle binary file properly or remove the entry
-  if (chartType === "AUTHOR_GRAPH") {
-  if (!clickedObject || !clickedObject.path.includes("/@")) return null;
+  if (chartType === "AUTHOR_GRAPH" || clickedObject.path.includes("/@")) {
 
   const authorName = clickedObject.name;
   const stats = databaseInfo.authorsTotalStats[authorName];

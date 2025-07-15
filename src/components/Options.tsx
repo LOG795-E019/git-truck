@@ -22,7 +22,8 @@ import {
   mdiPlusMinusVariant,
   mdiFolder,
   mdiGroup,
-  mdiTextBox
+  mdiTextBox,
+  mdiAccountMultiple
 } from "@mdi/js"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
@@ -69,7 +70,8 @@ export const Options = memo(function Options() {
   const groupingTypeIcons: Record<GroupingType, string> = {
     FILE_TYPE: mdiFileCodeOutline,
     FOLDER_NAME: mdiFolder,
-    JSON_RULES: mdiTextBox
+    JSON_RULES: mdiTextBox,
+    AUTHOR_FILES: mdiAccountMultiple
   }
 
   const chartTypeIcons: Record<ChartType, string> = {
