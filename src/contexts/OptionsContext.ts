@@ -53,6 +53,7 @@ export type Options = {
   showFilesWithNoJSONRules: boolean
   dominantAuthorCutoff: number
   linkMetricAndSizeMetric: boolean
+  selectedFilePaths: string[] // Changed from selectedFilePath to support multiple files
 }
 
 export type OptionsContextType = Options & {
@@ -72,6 +73,7 @@ export type OptionsContextType = Options & {
   setShowFilesWithNoJSONRules: (showFilesWithNoJSONRules: boolean) => void
   setDominantAuthorCutoff: (dominantAuthorCutoff: number) => void
   setLinkMetricAndSizeMetric: (link: boolean) => void
+  setSelectedFilePaths: (filePaths: string[]) => void // Updated setter
 }
 
 export const OptionsContext = createContext<OptionsContextType | undefined>(undefined)
@@ -93,7 +95,6 @@ const defaultOptions: Options = {
   sizeMetric: Object.keys(SizeMetric)[0] as SizeMetricType,
   groupingType: Object.keys(Grouping)[0] as GroupingType,
   commitSortingMethodsType: Object.keys(SortingMethods)[0] as CommitSortingMethodsType,
-  // The parameter value is based on default sorting method - date (true) or author (false)
   commitSortingOrdersType: Object.keys(SortingOrders(true))[0] as CommitSortingOrdersType,
   commitSearch: "",
   transitionsEnabled: true,
@@ -102,7 +103,8 @@ const defaultOptions: Options = {
   showFilesWithoutChanges: true,
   showFilesWithNoJSONRules: false,
   dominantAuthorCutoff: 0,
-  linkMetricAndSizeMetric: false
+  linkMetricAndSizeMetric: false,
+  selectedFilePaths: [] // Updated default
 }
 
 export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {}): OptionsContextType {
@@ -156,6 +158,9 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setLinkMetricAndSizeMetric: () => {
       throw new Error("No setLinkMetricAndSizeMetricSetter provided")
+    },
+    setSelectedFilePaths: () => {
+      throw new Error("No setSelectedFilePathsSetter provided")
     }
   }
 }

@@ -5,6 +5,7 @@ import type { ChartType } from "../contexts/OptionsContext"
 import { Chart, useOptions } from "../contexts/OptionsContext"
 import { Icon } from "@mdi/react"
 import { memo } from "react"
+import { FileSelector } from "src/components/FileSelector"
 
 import {
   mdiChartBubble,
@@ -69,7 +70,8 @@ export const Options = memo(function Options() {
   const groupingTypeIcons: Record<GroupingType, string> = {
     FILE_TYPE: mdiFileCodeOutline,
     FOLDER_NAME: mdiFolder,
-    JSON_RULES: mdiTextBox
+    JSON_RULES: mdiTextBox,
+    FILE_AUTHORS: mdiAccountNetwork
   }
 
   const chartTypeIcons: Record<ChartType, string> = {
@@ -139,6 +141,13 @@ export const Options = memo(function Options() {
           />
         </fieldset>
       </div>
+
+      {/* Add the conditional FileSelector here */}
+      {groupingType === "FILE_AUTHORS" && (
+        <div className="card mt-4">
+          <FileSelector />
+        </div>
+      )}
     </>
   )
 })

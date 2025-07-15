@@ -174,6 +174,11 @@ export function Providers({ children, data }: ProvidersProps) {
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           linkMetricAndSizeMetric: link
+        })),
+      setSelectedFilePaths: (filePaths: string[]) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          selectedFilePaths: filePaths
         }))
     }),
     [options, submit]
