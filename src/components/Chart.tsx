@@ -44,7 +44,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   const { searchResults } = useSearch()
   const size = useDeferredValue(rawSize)
   const { databaseInfo } = useData()
-  const { chartType, sizeMetric, groupingType, depthType, hierarchyType, labelsVisible, renderCutoff, selectedFilePaths } = useOptions()
+  const { chartType, sizeMetric, groupingType, depthType, hierarchyType, labelsVisible, renderCutoff, selectedFilePaths, selectedAuthorNames } = useOptions() // Add selectedAuthorNames
   const { path } = usePath()
   const { clickedObject, setClickedObject } = useClickedObject()
   const { setPath } = usePath()
@@ -103,11 +103,12 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       path,
       renderCutoff,
       showFilesWithNoJSONRules,
-      selectedFilePaths
+      selectedFilePaths,
+      selectedAuthorNames // Add this parameter
     ).descendants()
     console.timeEnd("nodes")
     return res
-  }, [size, chartType, sizeMetric, groupingType, path, renderCutoff, databaseInfo, filetree, selectedFilePaths])
+  }, [size, chartType, sizeMetric, groupingType, path, renderCutoff, databaseInfo, filetree, selectedFilePaths, selectedAuthorNames]) // Add selectedAuthorNames to dependencies
 
   useEffect(() => {
     setHoveredObject(null)
@@ -562,7 +563,8 @@ function createPartitionedHiearchy(
   path: string,
   renderCutoff: number,
   showFilesWithNoJSONRules: boolean,
-  selectedFilePaths: string[] // Add this parameter
+  selectedFilePaths: string[],
+  selectedAuthorNames: string[] // Add this parameter
 ) {
   let currentTree = tree
   const steps = path.substring(tree.name.length + 1).split("/")
@@ -643,11 +645,59 @@ function createPartitionedHiearchy(
       }
       castedTree = multiFileRoot as GitObject
     }
+  } else if (groupingType === "AUTHOR_FILES") {
+    
+    if (selectedAuthorNames.length === 0) {
+      // Return empty hierarchy if no authors are selected
+      const emptyRoot: GitTreeObject = {
+        type: "tree",
+        name: "Select authors to view their files",
+        path: "/",
+        children: [],
+        hash: hashString("no-authors-selected")
+      }
+      castedTree = emptyRoot as GitObject
+    } else if (selectedAuthorNames.length === 1) {
+      // Single author: show files directly as bubbles
+      const authorName = selectedAuthorNames[0]
+      const fileNodes = createFileNodesForAuthor(databaseInfo, authorName, sizeMetricType)
+      
+      const authorFileRoot: GitTreeObject = {
+        type: "tree",
+        name: `Files by ${authorName}`,
+        path: `/@${authorName}`,
+        children: fileNodes,
+        hash: hashString("author-files-" + authorName)
+      }
+      castedTree = authorFileRoot as GitObject
+    } else {
+      // Multiple authors: create author bubbles containing file bubbles
+      const authorNodes: GitTreeObject[] = selectedAuthorNames.map(authorName => {
+        const fileNodes = createFileNodesForAuthor(databaseInfo, authorName, sizeMetricType)
+        
+        return {
+          type: "tree",
+          name: authorName,
+          path: `/@${authorName}`,
+          children: fileNodes,
+          hash: hashString("author-files-" + authorName)
+        }
+      })
+
+      const multiAuthorRoot: GitTreeObject = {
+        type: "tree",
+        name: "Author Files View",
+        path: "/",
+        children: authorNodes,
+        hash: hashString("multi-author-files-" + selectedAuthorNames.join(","))
+      }
+      castedTree = multiAuthorRoot as GitObject
+    }
   } else {
-    // For non-FILE_AUTHORS groupings, use the existing logic
+    // For non-AUTHOR_FILES and non-FILE_AUTHORS groupings, use the existing logic
     castedTree = currentTree as GitObject
   }
-
+  
   const hiearchy = hierarchy(castedTree)
     .sum((d) => {
       // Special handling for FILE_AUTHORS grouping
@@ -1096,6 +1146,72 @@ function createAuthorNodesForFile(
       name: author,
       path: `${filePath}/@${author}`,
       hash: hashString(`file-author-${author}-${index}-${filePath}`),
+      contributionCount: contribution,
+      sizeInBytes: scaledSize * 1000,
+      size: scaledSize * 1000
+    }
+  })
+}
+
+// Helper function to create file nodes for a specific author
+function createFileNodesForAuthor(
+  databaseInfo: DatabaseInfo, 
+  authorName: string, 
+  sizeMetricType: SizeMetricType
+): GitBlobObject[] {
+  const authorFiles: Array<{ filePath: string; contribution: number }> = []
+  
+  // Get all files this author has worked on
+  const authorFileStats = databaseInfo.authorsFilesStats[authorName]
+  if (!authorFileStats) return []
+
+  Object.entries(authorFileStats).forEach(([filePath, fileStats]) => {
+    let contribution = 0
+    switch (sizeMetricType) {
+      case "MOST_COMMITS":
+        contribution = fileStats.nb_commits || 0
+        break
+      case "MOST_CONTRIBS":
+        contribution = fileStats.nb_line_change || 0
+        break
+      case "EQUAL_SIZE":
+        contribution = 1000 // Fixed value for all files
+        break
+      case "FILE_SIZE":
+      case "LAST_CHANGED":
+        // Default to line changes for author context
+        contribution = fileStats.nb_line_change || 0
+        break
+    }
+    
+    if (contribution > 0) {
+      authorFiles.push({ filePath, contribution })
+    }
+  })
+
+  // Sort by contribution (largest first)
+  authorFiles.sort((a, b) => b.contribution - a.contribution)
+
+  // Calculate total for scaling
+  const totalContribution = authorFiles.reduce((sum, item) => sum + item.contribution, 0)
+
+  return authorFiles.map(({ filePath, contribution }, index) => {
+    // For EQUAL_SIZE, all files should have the same normalized size
+    const normalizedSize = sizeMetricType === "EQUAL_SIZE"
+      ? 1 / authorFiles.length  // Equal distribution
+      : totalContribution > 0 ? contribution / totalContribution : 0
+
+    const minSize = 0.3
+    const maxSize = 2.0
+    const scaledSize = sizeMetricType === "EQUAL_SIZE"
+      ? 1.0  // Fixed size for equal
+      : minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
+
+    return {
+      type: "blob",
+      name: filePath.split('/').pop() || filePath,
+      path: filePath,
+      hash: hashString(`author-file-${authorName}-${index}-${filePath}`),
       contributionCount: contribution,
       sizeInBytes: scaledSize * 1000,
       size: scaledSize * 1000

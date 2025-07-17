@@ -142,7 +142,7 @@ export function DetailsCard({
   const isBlob = clickedObject.type === "blob"
   const extension = last(clickedObject.name.split("."))
   // TODO: handle binary file properly or remove the entry
-  if ((chartType === "AUTHOR_GRAPH" || groupingType === "FILE_AUTHORS") && clickedObject.path.includes("/@")) {
+  if ((chartType === "AUTHOR_GRAPH" || groupingType === "FILE_AUTHORS" || groupingType === "AUTHOR_FILES") && clickedObject.path.includes("/@")) {
     if (!clickedObject || !clickedObject.path.includes("/@")) return null;
 
     const authorName = clickedObject.name;
@@ -244,130 +244,250 @@ export function DetailsCard({
         </MenuTab>
       </div>
     )
-  }else {
+  }else if (groupingType === "AUTHOR_FILES" && !clickedObject.path.includes("/@")) {
+    // For files clicked in AUTHOR_FILES mode, show file details with author-specific stats
+    const authorName = clickedObject.name
+    const stats = databaseInfo.authorsTotalStats[authorName]
+    const color = authorColors.get(authorName) ?? "#ccc"
+    const isFileBlob = clickedObject.type === "blob"
+    const extension = last(clickedObject.name.split("."))
+    
     return (
-        <div
-          className={clsx(className, "card flex flex-col gap-2 transition-colors", {
-            "text-gray-100": !lightBackground,
-            "text-gray-800": lightBackground
-          })}
-          {...(backgroundColor
-            ? {
-                style: {
-                  backgroundColor
-                }
-              }
-            : {})}
-        >
-          <div className="flex">
-            <h2 className="card__title grid w-full grid-cols-[auto,1fr,auto] gap-2">
-              <Icon path={clickedObject.type === "blob" ? mdiFile : mdiFolder} size="1.25em" />
-              <span className="truncate" title={clickedObject.name}>
-                {clickedObject.name}
-              </span>
-              <CloseButton absolute={false} onClick={() => setClickedObject(null)} />
-            </h2>
-          </div>
-          <MenuTab>
-            <MenuItem title="General">
-              <div className="flex grow flex-col gap-2">
-                <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1">
-                  <CommitsEntry count={commitCount ?? 0} />
-                  {isBlob ? (
-                    <>
-                      <SizeEntry size={clickedObject.sizeInBytes} isBinary={false} />
-                      <LastchangedEntry epoch={databaseInfo.lastChanged[slicedPath]} />
-                    </>
-                  ) : (
-                    <FileAndSubfolderCountEntries clickedTree={clickedObject} />
-                  )}
-                  <PathEntry path={clickedObject.path} />
-                  </div>
-                  <div className="card bg-white/70 text-black">
-                  <div className="flex gap-2 mb-2">
-                    <button
-                      className={`btn btn-xs ${showPercent ? "btn--primary" : ""}`}
-                      onClick={() => setShowPercent(true)}
-                    >
-                      Percentages
-                    </button>
-                    <button
-                      className={`btn btn-xs ${!showPercent ? "btn--primary" : ""}`}
-                      onClick={() => setShowPercent(false)}
-                    >
-                      Raw Numbers
-                    </button>
-                  </div>
-                  <AuthorDistribution authors={authorContributions} contribSum={contribSum}  fetcher={fetcher} showPercent={showPercent} size_metric= {sizeMetric}/>
-                </div>
-              </div>
-              <div className="mt-2 flex gap-2">
-                {isBlob ? (
+      <div
+        className={clsx(className, "card flex flex-col gap-2 transition-colors", {
+          "text-gray-100": !lightBackground,
+          "text-gray-800": lightBackground
+        })}
+        style={{ backgroundColor: color }}
+      >
+        <div className="flex">
+          <h2 className="card__title grid w-full grid-cols-[auto,1fr,auto] gap-2">
+            <Icon path={isFileBlob ? mdiFile : mdiFolder} size="1.25em" />
+            <span className="truncate" title={clickedObject.name}>
+              {clickedObject.name}
+            </span>
+            <CloseButton absolute={false} onClick={() => setClickedObject(null)} />
+          </h2>
+        </div>
+        <MenuTab>
+          <MenuItem title="General">
+            <div className="flex grow flex-col gap-2">
+              <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1">
+                <CommitsEntry count={commitCount ?? 0} />
+                {isFileBlob ? (
                   <>
-                    <Form className="w-max" method="post" action={location.pathname}>
-                      <input type="hidden" name="ignore" value={clickedObject.path} />
-                      <button
-                        className="btn btn--outlined"
-                        type="submit"
-                        disabled={state !== "idle"}
-                        onClick={() => {
-                          isProcessingHideRef.current = true
-                        }}
-                        title="Hide this file"
-                      >
-                        <Icon path={mdiEyeOffOutline} />
-                        Hide
-                      </button>
-                    </Form>
-                    {clickedObject.name.includes(".") ? (
-                      <Form className="w-max" method="post" action={location.pathname}>
-                        <input type="hidden" name="ignore" value={`*.${extension}`} />
-                        <button
-                          className="btn btn--outlined"
-                          type="submit"
-                          disabled={state !== "idle"}
-                          title={`Hide all files with .${extension} extension`}
-                          onClick={() => {
-                            isProcessingHideRef.current = true
-                          }}
-                        >
-                          <Icon path={mdiEyeOffOutline} />
-                          <span>Hide .{extension}</span>
-                        </button>
-                      </Form>
-                    ) : null}
+                    <SizeEntry size={clickedObject.sizeInBytes} isBinary={false} />
+                    <LastchangedEntry epoch={databaseInfo.lastChanged[slicedPath]} />
                   </>
                 ) : (
-                  <>
-                    <Form method="post" action={location.pathname}>
-                      <input type="hidden" name="ignore" value={clickedObject.path} />
+                  <FileAndSubfolderCountEntries clickedTree={clickedObject} />
+                )}
+                <PathEntry path={clickedObject.path} />
+                </div>
+                <div className="card bg-white/70 text-black">
+                <div className="flex gap-2 mb-2">
+                  <button
+                    className={`btn btn-xs ${showPercent ? "btn--primary" : ""}`}
+                    onClick={() => setShowPercent(true)}
+                  >
+                    Percentages
+                  </button>
+                  <button
+                    className={`btn btn-xs ${!showPercent ? "btn--primary" : ""}`}
+                    onClick={() => setShowPercent(false)}
+                  >
+                    Raw Numbers
+                  </button>
+                </div>
+                <AuthorDistribution authors={authorContributions} contribSum={contribSum}  fetcher={fetcher} showPercent={showPercent} size_metric= {sizeMetric}/>
+              </div>
+            </div>
+            <div className="mt-2 flex gap-2">
+              {isFileBlob ? (
+                <>
+                  <Form className="w-max" method="post" action={location.pathname}>
+                    <input type="hidden" name="ignore" value={clickedObject.path} />
+                    <button
+                      className="btn btn--outlined"
+                      type="submit"
+                      disabled={state !== "idle"}
+                      onClick={() => {
+                        isProcessingHideRef.current = true
+                      }}
+                      title="Hide this file"
+                    >
+                      <Icon path={mdiEyeOffOutline} />
+                      Hide
+                    </button>
+                  </Form>
+                  {clickedObject.name.includes(".") ? (
+                    <Form className="w-max" method="post" action={location.pathname}>
+                      <input type="hidden" name="ignore" value={`*.${extension}`} />
                       <button
                         className="btn btn--outlined"
                         type="submit"
                         disabled={state !== "idle"}
+                        title={`Hide all files with .${extension} extension`}
                         onClick={() => {
                           isProcessingHideRef.current = true
-                          setPath(OneFolderOut(path))
                         }}
                       >
                         <Icon path={mdiEyeOffOutline} />
-                        Hide this folder
+                        <span>Hide .{extension}</span>
                       </button>
                     </Form>
-                  </>
-                )}
-                <button className="btn btn--outlined" onClick={showUnionAuthorsModal}>
-                  <Icon path={mdiAccountMultiple} />
-                  Group authors
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <Form method="post" action={location.pathname}>
+                    <input type="hidden" name="ignore" value={clickedObject.path} />
+                    <button
+                      className="btn btn--outlined"
+                      type="submit"
+                      disabled={state !== "idle"}
+                      onClick={() => {
+                        isProcessingHideRef.current = true
+                        setPath(OneFolderOut(path))
+                      }}
+                    >
+                      <Icon path={mdiEyeOffOutline} />
+                      Hide this folder
+                    </button>
+                  </Form>
+                </>
+              )}
+              <button className="btn btn--outlined" onClick={showUnionAuthorsModal}>
+                <Icon path={mdiAccountMultiple} />
+                Group authors
+              </button>
+            </div>
+          </MenuItem>
+          <MenuItem title="Commits">
+            <CommitsCard commitCount={commitCount ?? 0} />
+          </MenuItem>
+        </MenuTab>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={clsx(className, "card flex flex-col gap-2 transition-colors", {
+        "text-gray-100": !lightBackground,
+        "text-gray-800": lightBackground
+      })}
+      style={{ backgroundColor: backgroundColor ?? undefined }}
+    >
+      <div className="flex">
+        <h2 className="card__title grid w-full grid-cols-[auto,1fr,auto] gap-2">
+          <Icon path={isBlob ? mdiFile : mdiFolder} size="1.25em" />
+          <span className="truncate" title={clickedObject.name}>
+            {clickedObject.name}
+          </span>
+          <CloseButton absolute={false} onClick={() => setClickedObject(null)} />
+        </h2>
+      </div>
+      <MenuTab>
+        <MenuItem title="General">
+          <div className="flex grow flex-col gap-2">
+            <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1">
+              <CommitsEntry count={commitCount ?? 0} />
+              {isBlob ? (
+                <>
+                  <SizeEntry size={clickedObject.sizeInBytes} isBinary={false} />
+                  <LastchangedEntry epoch={databaseInfo.lastChanged[slicedPath]} />
+                </>
+              ) : (
+                <FileAndSubfolderCountEntries clickedTree={clickedObject} />
+              )}
+              <PathEntry path={clickedObject.path} />
+            </div>
+            <div className="card bg-white/70 text-black">
+              <div className="flex gap-2 mb-2">
+                <button
+                  className={`btn btn-xs ${showPercent ? "btn--primary" : ""}`}
+                  onClick={() => setShowPercent(true)}
+                >
+                  Percentages
+                </button>
+                <button
+                  className={`btn btn-xs ${!showPercent ? "btn--primary" : ""}`}
+                  onClick={() => setShowPercent(false)}
+                >
+                  Raw Numbers
                 </button>
               </div>
-            </MenuItem>
-            <MenuItem title="Commits">
-              <CommitsCard commitCount={commitCount ?? 0} />
-            </MenuItem>
-          </MenuTab>
-        </div>
-      )}
+              <AuthorDistribution authors={authorContributions} contribSum={contribSum} fetcher={fetcher} showPercent={showPercent} size_metric={sizeMetric} />
+            </div>
+          </div>
+          <div className="mt-2 flex gap-2">
+            {isBlob ? (
+              <>
+                <Form className="w-max" method="post" action={location.pathname}>
+                  <input type="hidden" name="ignore" value={clickedObject.path} />
+                  <button
+                    className="btn btn--outlined"
+                    type="submit"
+                    disabled={state !== "idle"}
+                    onClick={() => {
+                      isProcessingHideRef.current = true
+                    }}
+                    title="Hide this file"
+                  >
+                    <Icon path={mdiEyeOffOutline} />
+                    Hide
+                  </button>
+                </Form>
+                {clickedObject.name.includes(".") ? (
+                  <Form className="w-max" method="post" action={location.pathname}>
+                    <input type="hidden" name="ignore" value={`*.${extension}`} />
+                    <button
+                      className="btn btn--outlined"
+                      type="submit"
+                      disabled={state !== "idle"}
+                      title={`Hide all files with .${extension} extension`}
+                      onClick={() => {
+                        isProcessingHideRef.current = true
+                      }}
+                    >
+                      <Icon path={mdiEyeOffOutline} />
+                      <span>Hide .{extension}</span>
+                    </button>
+                  </Form>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <Form method="post" action={location.pathname}>
+                  <input type="hidden" name="ignore" value={clickedObject.path} />
+                  <button
+                    className="btn btn--outlined"
+                    type="submit"
+                    disabled={state !== "idle"}
+                    onClick={() => {
+                      isProcessingHideRef.current = true
+                      setPath(OneFolderOut(path))
+                    }}
+                  >
+                    <Icon path={mdiEyeOffOutline} />
+                    Hide this folder
+                  </button>
+                </Form>
+              </>
+            )}
+            <button className="btn btn--outlined" onClick={showUnionAuthorsModal}>
+              <Icon path={mdiAccountMultiple} />
+              Group authors
+            </button>
+          </div>
+        </MenuItem>
+        <MenuItem title="Commits">
+          <CommitsCard commitCount={commitCount ?? 0} />
+        </MenuItem>
+      </MenuTab>
+    </div>
+  )
 }
 
 function findObjectInTree(tree: GitTreeObject, object: GitObject | null) {

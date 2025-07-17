@@ -54,6 +54,7 @@ export type Options = {
   dominantAuthorCutoff: number
   linkMetricAndSizeMetric: boolean
   selectedFilePaths: string[] // Changed from selectedFilePath to support multiple files
+  selectedAuthorNames: string[] // Added property for selected author names
 }
 
 export type OptionsContextType = Options & {
@@ -74,6 +75,7 @@ export type OptionsContextType = Options & {
   setDominantAuthorCutoff: (dominantAuthorCutoff: number) => void
   setLinkMetricAndSizeMetric: (link: boolean) => void
   setSelectedFilePaths: (filePaths: string[]) => void // Updated setter
+  setSelectedAuthorNames: (authorNames: string[]) => void // Added setter for selected author names
 }
 
 export const OptionsContext = createContext<OptionsContextType | undefined>(undefined)
@@ -104,7 +106,8 @@ const defaultOptions: Options = {
   showFilesWithNoJSONRules: false,
   dominantAuthorCutoff: 0,
   linkMetricAndSizeMetric: false,
-  selectedFilePaths: [] // Updated default
+  selectedFilePaths: [], // Updated default
+  selectedAuthorNames: [] // Added default for selected author names
 }
 
 export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {}): OptionsContextType {
@@ -161,6 +164,9 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setSelectedFilePaths: () => {
       throw new Error("No setSelectedFilePathsSetter provided")
+    },
+    setSelectedAuthorNames: () => {
+      throw new Error("No setSelectedAuthorNamesSetter provided")
     }
   }
 }

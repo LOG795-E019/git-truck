@@ -6,6 +6,7 @@ import { Chart, useOptions } from "../contexts/OptionsContext"
 import { Icon } from "@mdi/react"
 import { memo, useMemo } from "react"
 import { FileSelector } from "src/components/FileSelector"
+import { AuthorSelector } from "./AuthorSelector"
 
 import {
   mdiChartBubble,
@@ -23,7 +24,8 @@ import {
   mdiPlusMinusVariant,
   mdiFolder,
   mdiGroup,
-  mdiTextBox
+  mdiTextBox,
+  mdiAccountBox
 } from "@mdi/js"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
@@ -48,7 +50,9 @@ export const Options = memo(function Options() {
     setMetricType,
     setChartType,
     setSizeMetricType,
-    setGroupingType
+    setGroupingType,
+    setSelectedFilePaths,
+    setSelectedAuthorNames
   } = useOptions()
 
   const visualizationIcons: Record<MetricType, string> = {
@@ -96,7 +100,8 @@ export const Options = memo(function Options() {
     FILE_TYPE: mdiFileCodeOutline,
     FOLDER_NAME: mdiFolder,
     JSON_RULES: mdiTextBox,
-    FILE_AUTHORS: mdiAccountNetwork
+    FILE_AUTHORS: mdiAccountNetwork,
+    AUTHOR_FILES: mdiAccountBox // Add this icon
   }
 
   const chartTypeIcons: Record<ChartType, string> = {
@@ -170,6 +175,14 @@ export const Options = memo(function Options() {
             onChange={(newGroupingType: GroupingType) => {
               setGroupingType(newGroupingType)
               
+              // Clear selections when switching between grouping types
+              if (newGroupingType !== "FILE_AUTHORS") {
+                setSelectedFilePaths([])
+              }
+              if (newGroupingType !== "AUTHOR_FILES") {
+                setSelectedAuthorNames([])
+              }
+              
               // Auto-switch to relevant size metric for FILE_AUTHORS
               if (newGroupingType === "FILE_AUTHORS") {
                 if (sizeMetric === "FILE_SIZE" || sizeMetric === "LAST_CHANGED") {
@@ -186,6 +199,13 @@ export const Options = memo(function Options() {
       {groupingType === "FILE_AUTHORS" && (
         <div className="card mt-4">
           <FileSelector />
+        </div>
+      )}
+
+      {/* Add the conditional AuthorSelector here */}
+      {groupingType === "AUTHOR_FILES" && (
+        <div className="card mt-4">
+          <AuthorSelector />
         </div>
       )}
     </>
