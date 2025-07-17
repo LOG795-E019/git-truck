@@ -128,9 +128,27 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
         }
       : {
           onClick: (evt) => {
-            evt.stopPropagation()
-            setClickedObject(d.data)
-            setPath(d.data.path)
+            if (isRoot) {
+              // Handle root clicks
+              evt.stopPropagation()
+              const parentPath = path.split("/").slice(0, -1).join("/")
+              if (parentPath === "") setPath("/")
+              else setPath(parentPath)
+            } else {
+              // Handle non-root clicks
+              evt.stopPropagation()
+              
+              // For FILE_AUTHORS grouping, author bubbles should be clickable
+              if (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) {
+                setClickedObject(d.data)
+              } else if (isTree(d.data)) {
+                // Regular tree navigation
+                setPath(d.data.path)
+              } else {
+                // Regular file clicks
+                setClickedObject(d.data)
+              }
+            }
           },
           onMouseOver: (evt) => {
             evt.stopPropagation()
@@ -632,6 +650,14 @@ function createPartitionedHiearchy(
 
   const hiearchy = hierarchy(castedTree)
     .sum((d) => {
+      // Special handling for FILE_AUTHORS grouping
+      if (groupingType === "FILE_AUTHORS" && d.path && d.path.includes("/@")) {
+        const authorBlob = d as GitBlobObject
+        // Use the pre-calculated size from createAuthorNodesForFile
+        return authorBlob.sizeInBytes ?? 1
+      }
+      
+      // Default logic for other groupings
       const blob = d as GitBlobObject
       switch (sizeMetricType) {
         case "FILE_SIZE":
@@ -1021,26 +1047,49 @@ function createAuthorNodesForFile(
   
   Object.entries(databaseInfo.authorsFilesStats).forEach(([author, fileStats]) => {
     if (fileStats[filePath]) {
-      const searched_Stat = sizeMetricType === "MOST_CONTRIBS" ? "nb_line_change" : "nb_commits"
-      const contribution = fileStats[filePath][searched_Stat] || 0
+      let contribution = 0
+      switch (sizeMetricType) {
+        case "MOST_COMMITS":
+          contribution = fileStats[filePath].nb_commits || 0
+          break
+        case "MOST_CONTRIBS":
+          contribution = fileStats[filePath].nb_line_change || 0
+          break
+        case "EQUAL_SIZE":
+          // For equal size, all authors get the same value
+          contribution = 1000 // Fixed value for all authors
+          break
+        case "FILE_SIZE":
+        case "LAST_CHANGED":
+          // For FILE_AUTHORS grouping, these don't make sense for individual authors
+          // Default to line changes as it's most meaningful for author contributions
+          contribution = fileStats[filePath].nb_line_change || 0
+          break
+      }
+      
       if (contribution > 0) {
         fileAuthors.push({ author, contribution })
       }
     }
   })
 
-  // Sort by contribution (largest first)
+  // Sort by contribution (largest first) - but for EQUAL_SIZE they'll all be the same
   fileAuthors.sort((a, b) => b.contribution - a.contribution)
 
   // Calculate total for scaling
   const totalContribution = fileAuthors.reduce((sum, item) => sum + item.contribution, 0)
 
   return fileAuthors.map(({ author, contribution }, index) => {
-    // Calculate normalized size (similar to author network logic)
-    const normalizedSize = totalContribution > 0 ? contribution / totalContribution : 0
+    // For EQUAL_SIZE, all authors should have the same normalized size
+    const normalizedSize = sizeMetricType === "EQUAL_SIZE" 
+      ? 1 / fileAuthors.length  // Equal distribution
+      : totalContribution > 0 ? contribution / totalContribution : 0
+
     const minSize = 0.3
     const maxSize = 2.0
-    const scaledSize = minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
+    const scaledSize = sizeMetricType === "EQUAL_SIZE"
+      ? 1.0  // Fixed size for equal
+      : minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
 
     return {
       type: "blob",
@@ -1048,7 +1097,7 @@ function createAuthorNodesForFile(
       path: `${filePath}/@${author}`,
       hash: hashString(`file-author-${author}-${index}-${filePath}`),
       contributionCount: contribution,
-      sizeInBytes: scaledSize * 1000, // Use fixed base size like in author network
+      sizeInBytes: scaledSize * 1000,
       size: scaledSize * 1000
     }
   })

@@ -4,7 +4,7 @@ import { EnumSelect } from "./EnumSelect"
 import type { ChartType } from "../contexts/OptionsContext"
 import { Chart, useOptions } from "../contexts/OptionsContext"
 import { Icon } from "@mdi/react"
-import { memo } from "react"
+import { memo, useMemo } from "react"
 import { FileSelector } from "src/components/FileSelector"
 
 import {
@@ -59,13 +59,38 @@ export const Options = memo(function Options() {
     MOST_CONTRIBUTIONS: mdiPlusMinusVariant
   }
 
-  const sizeMetricIcons: Record<SizeMetricType, string> = {
-    FILE_SIZE: mdiResize,
-    EQUAL_SIZE: mdiScaleBalance,
-    MOST_COMMITS: mdiSourceCommit,
-    LAST_CHANGED: mdiUpdate,
-    MOST_CONTRIBS: mdiPlusMinusVariant
-  }
+  const sizeMetricOptions = useMemo(() => {
+    if (groupingType === "FILE_AUTHORS") {
+      // Only return the relevant options for FILE_AUTHORS
+      return {
+        MOST_COMMITS: "Commits",
+        MOST_CONTRIBS: "Line Changes", 
+        EQUAL_SIZE: "Equal"
+      } as Record<SizeMetricType, string>
+    }
+    return SizeMetric // Use all options for other groupings
+  }, [groupingType])
+
+  const sizeMetricIcons = useMemo(() => {
+    const allIcons: Record<SizeMetricType, string> = {
+      FILE_SIZE: mdiResize,
+      EQUAL_SIZE: mdiScaleBalance,
+      MOST_COMMITS: mdiSourceCommit,
+      LAST_CHANGED: mdiUpdate,
+      MOST_CONTRIBS: mdiPlusMinusVariant
+    }
+    
+    if (groupingType === "FILE_AUTHORS") {
+      // Only return icons for the visible options
+      return {
+        MOST_COMMITS: allIcons.MOST_COMMITS,
+        MOST_CONTRIBS: allIcons.MOST_CONTRIBS,
+        EQUAL_SIZE: allIcons.EQUAL_SIZE
+      } as Record<SizeMetricType, string>
+    }
+    
+    return allIcons
+  }, [groupingType])
 
   const groupingTypeIcons: Record<GroupingType, string> = {
     FILE_TYPE: mdiFileCodeOutline,
@@ -95,39 +120,45 @@ export const Options = memo(function Options() {
             iconMap={chartTypeIcons}
           />
         </fieldset>
+        
         <fieldset className="rounded-lg border p-2">
           <legend className="card__title ml-1.5 justify-start gap-2">
             <Icon path={mdiImageSizeSelectSmall} size="1.25em" />
             Size
           </legend>
           <EnumSelect
-            enum={SizeMetric}
+            enum={sizeMetricOptions}
             defaultValue={sizeMetric}
             onChange={(sizeMetric: SizeMetricType) => setSizeMetricType(sizeMetric)}
             iconMap={sizeMetricIcons}
           />
         </fieldset>
-        <fieldset className="rounded-lg border p-2">
-          <legend className="card__title ml-1.5 justify-start gap-2">
-            <Icon path={mdiPalette} size="1.25em" />
-            Color
-          </legend>
-          <EnumSelect
-            enum={Metric}
-            defaultValue={metricType}
-            onChange={(metric: MetricType) => {
-              setMetricType(metric)
-              if (!linkMetricAndSizeMetric) {
-                return
-              }
-              const relatedSizeMetricType = relatedSizeMetric[metric]
-              if (relatedSizeMetricType) {
-                setSizeMetricType(relatedSizeMetricType)
-              }
-            }}
-            iconMap={visualizationIcons}
-          />
-        </fieldset>
+        
+        {/* Only show Color options for non-FILE_AUTHORS groupings */}
+        {groupingType !== "FILE_AUTHORS" && (
+          <fieldset className="rounded-lg border p-2">
+            <legend className="card__title ml-1.5 justify-start gap-2">
+              <Icon path={mdiPalette} size="1.25em" />
+              Color
+            </legend>
+            <EnumSelect
+              enum={Metric}
+              defaultValue={metricType}
+              onChange={(metric: MetricType) => {
+                setMetricType(metric)
+                if (!linkMetricAndSizeMetric) {
+                  return
+                }
+                const relatedSizeMetricType = relatedSizeMetric[metric]
+                if (relatedSizeMetricType) {
+                  setSizeMetricType(relatedSizeMetricType)
+                }
+              }}
+              iconMap={visualizationIcons}
+            />
+          </fieldset>
+        )}
+        
         <fieldset className="rounded-lg border p-2">
           <legend className="card__title ml-1.5 justify-start gap-2">
             <Icon path={mdiGroup} size="1.25em" />
@@ -136,7 +167,16 @@ export const Options = memo(function Options() {
           <EnumSelect
             enum={Grouping}
             defaultValue={groupingType}
-            onChange={(groupingType: GroupingType) => setGroupingType(groupingType)}
+            onChange={(newGroupingType: GroupingType) => {
+              setGroupingType(newGroupingType)
+              
+              // Auto-switch to relevant size metric for FILE_AUTHORS
+              if (newGroupingType === "FILE_AUTHORS") {
+                if (sizeMetric === "FILE_SIZE" || sizeMetric === "LAST_CHANGED") {
+                  setSizeMetricType("MOST_CONTRIBS") // Default to line changes
+                }
+              }
+            }}
             iconMap={groupingTypeIcons}
           />
         </fieldset>
