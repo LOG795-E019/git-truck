@@ -44,7 +44,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   const { searchResults } = useSearch()
   const size = useDeferredValue(rawSize)
   const { databaseInfo } = useData()
-  const { chartType, sizeMetric, groupingType, depthType, hierarchyType, labelsVisible, renderCutoff } = useOptions()
+  const { chartType, sizeMetric, groupingType, depthType, hierarchyType, labelsVisible, renderCutoff, selectedFilePaths } = useOptions()
   const { path } = usePath()
   const { clickedObject, setClickedObject } = useClickedObject()
   const { setPath } = usePath()
@@ -102,11 +102,12 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       groupingType,
       path,
       renderCutoff,
-      showFilesWithNoJSONRules
+      showFilesWithNoJSONRules,
+      selectedFilePaths
     ).descendants()
     console.timeEnd("nodes")
     return res
-  }, [size, chartType, sizeMetric, path, renderCutoff, databaseInfo, filetree])
+  }, [size, chartType, sizeMetric, groupingType, path, renderCutoff, databaseInfo, filetree, selectedFilePaths])
 
   useEffect(() => {
     setHoveredObject(null)
@@ -310,7 +311,7 @@ function filterGitTree(
 
 function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch: boolean }) {
   const [metricsData, authorColors] = useMetrics()
-  const { chartType, metricType, transitionsEnabled } = useOptions()
+  const { chartType, metricType, transitionsEnabled, groupingType } = useOptions() // Add groupingType
   const [, size] = useComponentSize()
   
   const commonProps = useMemo(() => {
@@ -318,6 +319,10 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
     
     if (chartType === "AUTHOR_GRAPH" && d.data.path.includes("/@")) {
       // For author graph, use the authorColor property
+      const authorName = d.data.name
+      fillColor = authorColors.get(authorName) || "#cccccc"
+    } else if (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) {
+      // For file authors view, use author colors
       const authorName = d.data.name
       fillColor = authorColors.get(authorName) || "#cccccc"
     } else {
@@ -385,7 +390,7 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
       }
     }
     return props
-  }, [d, metricsData, metricType, chartType])
+  }, [d, metricsData, metricType, chartType, groupingType]) // Add groupingType to dependencies
 
   return (
     <rect
@@ -538,7 +543,8 @@ function createPartitionedHiearchy(
   groupingType: GroupingType,
   path: string,
   renderCutoff: number,
-  showFilesWithNoJSONRules: boolean
+  showFilesWithNoJSONRules: boolean,
+  selectedFilePaths: string[] // Add this parameter
 ) {
   let currentTree = tree
   const steps = path.substring(tree.name.length + 1).split("/")
@@ -568,7 +574,61 @@ function createPartitionedHiearchy(
     currentTree = fileJSONRulesGrouping(currentTree, zoomFilter, showFilesWithNoJSONRules)
   }
 
-  let castedTree = currentTree as GitObject
+  // Declare castedTree once at the top
+  let castedTree: GitObject
+
+  // Add this new section for FILE_AUTHORS grouping
+  if (groupingType === "FILE_AUTHORS") {
+    if (selectedFilePaths.length === 0) {
+      // Return empty hierarchy if no files are selected
+      const emptyRoot: GitTreeObject = {
+        type: "tree",
+        name: "Select files to view their authors",
+        path: "/",
+        children: [],
+        hash: hashString("no-files-selected")
+      }
+      castedTree = emptyRoot as GitObject
+    } else if (selectedFilePaths.length === 1) {
+      // Single file: show authors directly as bubbles
+      const filePath = selectedFilePaths[0]
+      const authorNodes = createAuthorNodesForFile(databaseInfo, filePath, sizeMetricType)
+      
+      const fileAuthorRoot: GitTreeObject = {
+        type: "tree",
+        name: `Authors of ${filePath.split('/').pop()}`,
+        path: filePath,
+        children: authorNodes,
+        hash: hashString("file-authors-" + filePath)
+      }
+      castedTree = fileAuthorRoot as GitObject
+    } else {
+      // Multiple files: create file bubbles containing author bubbles
+      const fileNodes: GitTreeObject[] = selectedFilePaths.map(filePath => {
+        const authorNodes = createAuthorNodesForFile(databaseInfo, filePath, sizeMetricType)
+        
+        return {
+          type: "tree",
+          name: filePath.split('/').pop() || filePath,
+          path: filePath,
+          children: authorNodes,
+          hash: hashString("file-authors-" + filePath)
+        }
+      })
+
+      const multiFileRoot: GitTreeObject = {
+        type: "tree",
+        name: "File Authors View",
+        path: "/",
+        children: fileNodes,
+        hash: hashString("multi-file-authors-" + selectedFilePaths.join(","))
+      }
+      castedTree = multiFileRoot as GitObject
+    }
+  } else {
+    // For non-FILE_AUTHORS groupings, use the existing logic
+    castedTree = currentTree as GitObject
+  }
 
   const hiearchy = hierarchy(castedTree)
     .sum((d) => {
@@ -949,4 +1009,47 @@ export function getAuthorsRelationships(
   }
 
   return relationshipMap;
+}
+
+// Helper function to create author nodes for a specific file
+function createAuthorNodesForFile(
+  databaseInfo: DatabaseInfo, 
+  filePath: string, 
+  sizeMetricType: SizeMetricType
+): GitBlobObject[] {
+  const fileAuthors: Array<{ author: string; contribution: number }> = []
+  
+  Object.entries(databaseInfo.authorsFilesStats).forEach(([author, fileStats]) => {
+    if (fileStats[filePath]) {
+      const searched_Stat = sizeMetricType === "MOST_CONTRIBS" ? "nb_line_change" : "nb_commits"
+      const contribution = fileStats[filePath][searched_Stat] || 0
+      if (contribution > 0) {
+        fileAuthors.push({ author, contribution })
+      }
+    }
+  })
+
+  // Sort by contribution (largest first)
+  fileAuthors.sort((a, b) => b.contribution - a.contribution)
+
+  // Calculate total for scaling
+  const totalContribution = fileAuthors.reduce((sum, item) => sum + item.contribution, 0)
+
+  return fileAuthors.map(({ author, contribution }, index) => {
+    // Calculate normalized size (similar to author network logic)
+    const normalizedSize = totalContribution > 0 ? contribution / totalContribution : 0
+    const minSize = 0.3
+    const maxSize = 2.0
+    const scaledSize = minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
+
+    return {
+      type: "blob",
+      name: author,
+      path: `${filePath}/@${author}`,
+      hash: hashString(`file-author-${author}-${index}-${filePath}`),
+      contributionCount: contribution,
+      sizeInBytes: scaledSize * 1000, // Use fixed base size like in author network
+      size: scaledSize * 1000
+    }
+  })
 }
