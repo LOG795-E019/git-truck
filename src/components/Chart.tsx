@@ -157,92 +157,93 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
         }}
       >
         {/* Draw relationship lines for AUTHOR_GRAPH */}
-        {chartType === "AUTHOR_GRAPH" && (() => {
-          // Build node position map
-          const nodePositions: Record<string, { x: number; y: number; r: number }> = {};
-          nodes.forEach((d) => {
-            if (d.data.path && d.data.path.includes("/@")) {
-              const node = d as HierarchyCircularNode<GitObject>;
-              nodePositions[d.data.name] = { x: node.x, y: node.y, r: node.r };
-            }
-          });
-
-          // Get relationships map
-          const relationshipsMap = getAuthorsRelationships(databaseInfo);
-          // Get author colors
-          const [, authorColors] = useMetrics();
-
-          const offsetAmount = 8; // pixels
-
-          return Object.entries(relationshipsMap).flatMap(([author1, relObj]) =>
-            Object.entries(relObj.Relationships).flatMap(([author2, relData]) => {
-              const pos1 = nodePositions[author1];
-              const pos2 = nodePositions[author2];
-              if (!pos1 || !pos2) return [];
-              const searched_Stat = sizeMetric === "MOST_CONTRIBS" ? "nb_line_change" : "nb_commits";
-              const author1Value = relData.author1Contribs[searched_Stat];
-              const author2Value = relData.author2Contribs[searched_Stat];
-              const totalValue = author1Value + author2Value;
-
-              // Avoid division by zero
-              const author1Percent = totalValue > 0 ? author1Value / totalValue : 0;
-              const author2Percent = totalValue > 0 ? author2Value / totalValue : 0;
-
-              // Scale thickness (adjust base and scaling as needed)
-              const baseWidth = Math.max(2, Math.log(totalValue + 1));
-              const strokeWidth1 = baseWidth * author1Percent*1.5;
-              const strokeWidth2 = baseWidth * author2Percent*1.5;
-              const color1 = authorColors.get(author1) || "#888";
-              const color2 = authorColors.get(author2) || "#888";
-
-              // Offset each line by half the other line's width
-              const offsetA = (strokeWidth2 / 2);
-              const offsetB = (strokeWidth1 / 2);
-
-              // Perpendicular vector (normalized)
-              const dx = pos2.x - pos1.x;
-              const dy = pos2.y - pos1.y;
-              const length = Math.sqrt(dx * dx + dy * dy) || 1;
-              const perpX = -dy / length;
-              const perpY = dx / length;
-
-              // Author 1's line (offset by half of author2's width)
-              const x1a = pos1.x + perpX * offsetA;
-              const y1a = pos1.y + perpY * offsetA;
-              const x2a = pos2.x + perpX * offsetA;
-              const y2a = pos2.y + perpY * offsetA;
-
-              // Author 2's line (offset by half of author1's width)
-              const x1b = pos1.x - perpX * offsetB;
-              const y1b = pos1.y - perpY * offsetB;
-              const x2b = pos2.x - perpX * offsetB;
-              const y2b = pos2.y - perpY * offsetB;
-
-              return [
-                <line
-                  key={`rel-${author1}-${author2}-1`}
-                  x1={x1a}
-                  y1={y1a}
-                  x2={x2a}
-                  y2={y2a}
-                  stroke={color1}
-                  strokeWidth={strokeWidth1}
-                  opacity={0.7}
-                />,
-                <line
-                  key={`rel-${author1}-${author2}-2`}
-                  x1={x1b}
-                  y1={y1b}
-                  x2={x2b}
-                  y2={y2b}
-                  stroke={color2}
-                  strokeWidth={strokeWidth2}
-                  opacity={0.7}
-                />
-              ];
+        {chartType === "AUTHOR_GRAPH" &&
+          (() => {
+            // Build node position map
+            const nodePositions: Record<string, { x: number; y: number; r: number }> = {}
+            nodes.forEach((d) => {
+              if (d.data.path && d.data.path.includes("/@")) {
+                const node = d as HierarchyCircularNode<GitObject>
+                nodePositions[d.data.name] = { x: node.x, y: node.y, r: node.r }
+              }
             })
-          );
-        })()}
+
+            // Get relationships map
+            const relationshipsMap = getAuthorsRelationships(databaseInfo)
+            // Get author colors
+            const [, authorColors] = useMetrics()
+
+            const offsetAmount = 8 // pixels
+
+            return Object.entries(relationshipsMap).flatMap(([author1, relObj]) =>
+              Object.entries(relObj.Relationships).flatMap(([author2, relData]) => {
+                const pos1 = nodePositions[author1]
+                const pos2 = nodePositions[author2]
+                if (!pos1 || !pos2) return []
+                const searched_Stat = sizeMetric === "MOST_CONTRIBS" ? "nb_line_change" : "nb_commits"
+                const author1Value = relData.author1Contribs[searched_Stat]
+                const author2Value = relData.author2Contribs[searched_Stat]
+                const totalValue = author1Value + author2Value
+
+                // Avoid division by zero
+                const author1Percent = totalValue > 0 ? author1Value / totalValue : 0
+                const author2Percent = totalValue > 0 ? author2Value / totalValue : 0
+
+                // Scale thickness (adjust base and scaling as needed)
+                const baseWidth = Math.max(2, Math.log(totalValue + 1))
+                const strokeWidth1 = baseWidth * author1Percent * 1.5
+                const strokeWidth2 = baseWidth * author2Percent * 1.5
+                const color1 = authorColors.get(author1) || "#888"
+                const color2 = authorColors.get(author2) || "#888"
+
+                // Offset each line by half the other line's width
+                const offsetA = strokeWidth2 / 2
+                const offsetB = strokeWidth1 / 2
+
+                // Perpendicular vector (normalized)
+                const dx = pos2.x - pos1.x
+                const dy = pos2.y - pos1.y
+                const length = Math.sqrt(dx * dx + dy * dy) || 1
+                const perpX = -dy / length
+                const perpY = dx / length
+
+                // Author 1's line (offset by half of author2's width)
+                const x1a = pos1.x + perpX * offsetA
+                const y1a = pos1.y + perpY * offsetA
+                const x2a = pos2.x + perpX * offsetA
+                const y2a = pos2.y + perpY * offsetA
+
+                // Author 2's line (offset by half of author1's width)
+                const x1b = pos1.x - perpX * offsetB
+                const y1b = pos1.y - perpY * offsetB
+                const x2b = pos2.x - perpX * offsetB
+                const y2b = pos2.y - perpY * offsetB
+
+                return [
+                  <line
+                    key={`rel-${author1}-${author2}-1`}
+                    x1={x1a}
+                    y1={y1a}
+                    x2={x2a}
+                    y2={y2a}
+                    stroke={color1}
+                    strokeWidth={strokeWidth1}
+                    opacity={0.7}
+                  />,
+                  <line
+                    key={`rel-${author1}-${author2}-2`}
+                    x1={x1b}
+                    y1={y1b}
+                    x2={x2b}
+                    y2={y2b}
+                    stroke={color2}
+                    strokeWidth={strokeWidth2}
+                    opacity={0.7}
+                  />
+                ]
+              })
+            )
+          })()}
 
         {/* Draw author nodes and other nodes */}
         {nodes.map((d, i) => (
@@ -312,10 +313,10 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
   const [metricsData, authorColors] = useMetrics()
   const { chartType, metricType, transitionsEnabled } = useOptions()
   const [, size] = useComponentSize()
-  
+
   const commonProps = useMemo(() => {
     let fillColor: string
-    
+
     if (chartType === "AUTHOR_GRAPH" && d.data.path.includes("/@")) {
       // For author graph, use the authorColor property
       const authorName = d.data.name
@@ -326,7 +327,7 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
         ? (metricsData.get(metricType)?.colormap.get(d.data.path) ?? missingInMapColor)
         : "transparent"
     }
-    
+
     let props: JSX.IntrinsicElements["rect"] = {
       strokeWidth: "1px",
       fill: fillColor
@@ -356,7 +357,7 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
       }
     } else if (chartType === "AUTHOR_GRAPH") {
       const datum = d as HierarchyCircularNode<GitObject>
-      
+
       // Check if this is the outer container (author-network) or an individual author
       if (d.data.name === "author-network") {
         // Outer container: rounded rectangle filling the whole space
@@ -628,13 +629,12 @@ function createPartitionedHiearchy(
       return cast.r >= cutOff
     })
     return bPartition
-  }
-  else if (chartType === "AUTHOR_GRAPH") {
+  } else if (chartType === "AUTHOR_GRAPH") {
     // Create a network/graph layout for author relationships
     console.log("lol:", sizeMetricType)
 
     const authorNetwork = createAuthorNetworkHierarchy(databaseInfo, currentTree, sizeMetricType)
-    
+
     // Apply a custom sum function that gives each author a fixed size
     const authorHierarchy = authorNetwork.sum((d) => {
       // For author nodes, return the calculated size
@@ -648,25 +648,24 @@ function createPartitionedHiearchy(
     const authorGraphPartition = pack<GitObject>()
       .size([size.width, size.height - estimatedLetterHeightForDirText])
       .padding(50)
-    
+
     const agPartition = authorGraphPartition(authorHierarchy)
 
-    const nodePositions: Record<string, { x: number; y: number; r: number }> = {};
-      agPartition.descendants().forEach(node => {
-        if (node.data.path.includes("/@")) {
-          nodePositions[node.data.name] = { x: node.x, y: node.y, r: node.r };
-        }
-    });
-    
+    const nodePositions: Record<string, { x: number; y: number; r: number }> = {}
+    agPartition.descendants().forEach((node) => {
+      if (node.data.path.includes("/@")) {
+        nodePositions[node.data.name] = { x: node.x, y: node.y, r: node.r }
+      }
+    })
+
     // Filter out circles that are too small
     filterTree(agPartition, (child) => {
       const cast = child as HierarchyCircularNode<GitObject>
       return cast.r >= cutOff
     })
-    
+
     return agPartition
-  }
-  else {
+  } else {
     throw new Error("Unknown chart type: " + chartType)
   }
 }
@@ -884,7 +883,7 @@ function createAuthorFileHierarchy(
   const children: GitTreeObject[] = Object.entries(authorFileGroups).map(([author, files]) => {
     // Sort files by contribution (highest first) and take top 5
     const sortedFiles = files
-      .map(file => ({
+      .map((file) => ({
         ...file,
         authorContrib: databaseInfo.authorsFilesStats[author]?.[file.path]?.[searched_Stat] || 0
       }))
@@ -911,25 +910,35 @@ function createAuthorFileHierarchy(
 function createAuthorNetworkHierarchy(
   databaseInfo: DatabaseInfo,
   tree: GitTreeObject,
-  context: string
+  sizeMetricType: string
 ): HierarchyNode<GitObject> {
   const fixedAuthorSize = 1000
-
-  // Choose stat type
-  const searched_Stat = context === "MOST_CONTRIBS" ? "nb_line_change" : "nb_commits"
 
   // Get all authors and their total stats
   const authorEntries = Object.entries(databaseInfo.authorsTotalStats)
 
   // Get all values for scaling
-  const allValues = authorEntries.map(([author, stats]) => stats[searched_Stat] ?? 1)
+  const allValues = authorEntries.map(
+    ([author, stats]) => stats[sizeMetricType === "MOST_CONTRIBS" ? "nb_line_change" : "nb_commits"] ?? 1
+  )
   const totalValue = allValues.reduce((sum, count) => sum + count, 0)
 
   // Get relationships map
-  const relationshipsMap = getAuthorsRelationships(databaseInfo);
+  const relationshipsMap = getAuthorsRelationships(databaseInfo)
 
   const authorNodes: GitBlobObject[] = authorEntries.map(([author, stats], index) => {
-    const value = stats[searched_Stat] ?? 1
+    let value: number
+    switch (sizeMetricType) {
+      case "MOST_COMMITS":
+        value = stats["nb_commits"] ?? 1
+        break
+      case "MOST_CONTRIBS":
+        value = stats["nb_line_change"] ?? 1
+        break
+      default: // EQUAL_SIZE
+        value = 1
+        break
+    }
 
     // Calculate normalized size
     const normalizedSize = value / totalValue
@@ -962,63 +971,72 @@ function createAuthorNetworkHierarchy(
   return hierarchy(authorNetworkRoot as GitObject)
 }
 
-export function getAuthorsRelationships(
-  databaseInfo: DatabaseInfo,
-) {
-  const relationshipMap: Record<string, { Relationships: Record<string, { 
-    commonFiles: string[],
-    author1Contribs: { nb_commits: number; nb_line_change: number },
-    author2Contribs: { nb_commits: number; nb_line_change: number }
-  }> }> = {};
+export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
+  const relationshipMap: Record<
+    string,
+    {
+      Relationships: Record<
+        string,
+        {
+          commonFiles: string[]
+          author1Contribs: { nb_commits: number; nb_line_change: number }
+          author2Contribs: { nb_commits: number; nb_line_change: number }
+        }
+      >
+    }
+  > = {}
 
-  const authorsFileStats = databaseInfo.authorsFilesStats;
-  const authors = Object.keys(authorsFileStats);
+  const authorsFileStats = databaseInfo.authorsFilesStats
+  const authors = Object.keys(authorsFileStats)
 
   // Initialize all authors first
   for (const author of authors) {
-    if (!relationshipMap[author]) relationshipMap[author] = { Relationships: {} };
+    if (!relationshipMap[author]) relationshipMap[author] = { Relationships: {} }
   }
 
   for (let i = 0; i < authors.length; i++) {
-    const author1 = authors[i];
+    const author1 = authors[i]
 
     for (let j = i + 1; j < authors.length; j++) {
-      const author2 = authors[j];
+      const author2 = authors[j]
 
       // Find common files
-      const files1 = Object.keys(authorsFileStats[author1]);
-      const files2 = Object.keys(authorsFileStats[author2]);
-      const commonFiles = files1.filter(f => {
-        if (!files2.includes(f)) return false;
-        const lc1 = authorsFileStats[author1][f].nb_line_change;
-        const lc2 = authorsFileStats[author2][f].nb_line_change;
-        return (
-          (lc1 >= 0.2 * lc2 && lc2 > 0) ||
-          (lc2 >= 0.2 * lc1 && lc1 > 0)
-        );
-      });
+      const files1 = Object.keys(authorsFileStats[author1])
+      const files2 = Object.keys(authorsFileStats[author2])
+      const commonFiles = files1.filter((f) => {
+        if (!files2.includes(f)) return false
+        const lc1 = authorsFileStats[author1][f].nb_line_change
+        const lc2 = authorsFileStats[author2][f].nb_line_change
+        return (lc1 >= 0.2 * lc2 && lc2 > 0) || (lc2 >= 0.2 * lc1 && lc1 > 0)
+      })
 
       if (commonFiles.length > 0) {
         const relData = {
           commonFiles,
-          author1Contribs: commonFiles.reduce((acc, file) => ({
-            nb_commits: acc.nb_commits + authorsFileStats[author1][file].nb_commits,
-            nb_line_change: acc.nb_line_change + authorsFileStats[author1][file].nb_line_change
-          }), { nb_commits: 0, nb_line_change: 0 }),
-          author2Contribs: commonFiles.reduce((acc, file) => ({
-            nb_commits: acc.nb_commits + authorsFileStats[author2][file].nb_commits,
-            nb_line_change: acc.nb_line_change + authorsFileStats[author2][file].nb_line_change
-          }), { nb_commits: 0, nb_line_change: 0 })
-        };
-        relationshipMap[author1].Relationships[author2] = relData;
+          author1Contribs: commonFiles.reduce(
+            (acc, file) => ({
+              nb_commits: acc.nb_commits + authorsFileStats[author1][file].nb_commits,
+              nb_line_change: acc.nb_line_change + authorsFileStats[author1][file].nb_line_change
+            }),
+            { nb_commits: 0, nb_line_change: 0 }
+          ),
+          author2Contribs: commonFiles.reduce(
+            (acc, file) => ({
+              nb_commits: acc.nb_commits + authorsFileStats[author2][file].nb_commits,
+              nb_line_change: acc.nb_line_change + authorsFileStats[author2][file].nb_line_change
+            }),
+            { nb_commits: 0, nb_line_change: 0 }
+          )
+        }
+        relationshipMap[author1].Relationships[author2] = relData
         relationshipMap[author2].Relationships[author1] = {
           commonFiles,
           author1Contribs: relData.author2Contribs,
           author2Contribs: relData.author1Contribs
-        };
+        }
       }
     }
   }
 
-  return relationshipMap;
+  return relationshipMap
 }
