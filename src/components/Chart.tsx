@@ -44,7 +44,17 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   const { searchResults } = useSearch()
   const size = useDeferredValue(rawSize)
   const { databaseInfo } = useData()
-  const { chartType, sizeMetric, groupingType, depthType, hierarchyType, labelsVisible, renderCutoff } = useOptions()
+  const {
+    chartType,
+    sizeMetric,
+    groupingType,
+    depthType,
+    hierarchyType,
+    labelsVisible,
+    renderCutoff,
+    minBubbleSize,
+    maxBubbleSize
+  } = useOptions()
   const { path } = usePath()
   const { clickedObject, setClickedObject } = useClickedObject()
   const { setPath } = usePath()
@@ -102,11 +112,13 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       groupingType,
       path,
       renderCutoff,
+      minBubbleSize,
+      maxBubbleSize,
       showFilesWithNoJSONRules
     ).descendants()
     console.timeEnd("nodes")
     return res
-  }, [size, chartType, sizeMetric, path, renderCutoff, databaseInfo, filetree])
+  }, [size, chartType, sizeMetric, path, renderCutoff, minBubbleSize, maxBubbleSize, databaseInfo, filetree])
 
   useEffect(() => {
     setHoveredObject(null)
@@ -539,6 +551,8 @@ function createPartitionedHiearchy(
   groupingType: GroupingType,
   path: string,
   renderCutoff: number,
+  minBubbleSize: number,
+  maxBubbleSize: number,
   showFilesWithNoJSONRules: boolean
 ) {
   let currentTree = tree
@@ -618,8 +632,7 @@ function createPartitionedHiearchy(
     })
 
     return tmPartition
-  }
-  if (chartType === "BUBBLE_CHART") {
+  } else if (chartType === "BUBBLE_CHART") {
     const bubbleChartPartition = pack<GitObject>()
       .size([size.width, size.height - estimatedLetterHeightForDirText])
       .padding(bubblePadding)
@@ -631,9 +644,13 @@ function createPartitionedHiearchy(
     return bPartition
   } else if (chartType === "AUTHOR_GRAPH") {
     // Create a network/graph layout for author relationships
-    console.log("lol:", sizeMetricType)
-
-    const authorNetwork = createAuthorNetworkHierarchy(databaseInfo, currentTree, sizeMetricType)
+    const authorNetwork = createAuthorNetworkHierarchy(
+      databaseInfo,
+      currentTree,
+      sizeMetricType,
+      minBubbleSize,
+      maxBubbleSize
+    )
 
     // Apply a custom sum function that gives each author a fixed size
     const authorHierarchy = authorNetwork.sum((d) => {
@@ -910,7 +927,9 @@ function createAuthorFileHierarchy(
 function createAuthorNetworkHierarchy(
   databaseInfo: DatabaseInfo,
   tree: GitTreeObject,
-  sizeMetricType: string
+  sizeMetricType: string,
+  minBubbleSize: number,
+  maxBubbleSize: number
 ): HierarchyNode<GitObject> {
   const fixedAuthorSize = 1000
 
@@ -942,8 +961,8 @@ function createAuthorNetworkHierarchy(
 
     // Calculate normalized size
     const normalizedSize = value / totalValue
-    const minSize = 0.1
-    const maxSize = 2.0
+    const minSize = minBubbleSize
+    const maxSize = maxBubbleSize
     const scaledSize = minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
 
     return {

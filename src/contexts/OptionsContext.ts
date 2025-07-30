@@ -49,6 +49,8 @@ export type Options = {
   transitionsEnabled: boolean
   labelsVisible: boolean
   renderCutoff: number
+  minBubbleSize: number
+  maxBubbleSize: number
   showFilesWithoutChanges: boolean
   showFilesWithNoJSONRules: boolean
   dominantAuthorCutoff: number
@@ -68,6 +70,8 @@ export type OptionsContextType = Options & {
   setCommitSortingOrdersType: (commitSortingOrdersType: CommitSortingOrdersType) => void
   setCommitSearch: (commitSearch: string) => void
   setRenderCutoff: (renderCutoff: number) => void
+  setMinBubbleSize: (minBubbleSize: number) => void
+  setMaxBubbleSize: (maxBubbleSize: number) => void
   setShowFilesWithoutChanges: (showFilesWithoutChanges: boolean) => void
   setShowFilesWithNoJSONRules: (showFilesWithNoJSONRules: boolean) => void
   setDominantAuthorCutoff: (dominantAuthorCutoff: number) => void
@@ -99,6 +103,8 @@ const defaultOptions: Options = {
   transitionsEnabled: true,
   labelsVisible: true,
   renderCutoff: 2,
+  minBubbleSize: 0.1,
+  maxBubbleSize: 2,
   showFilesWithoutChanges: true,
   showFilesWithNoJSONRules: false,
   dominantAuthorCutoff: 0,
@@ -144,6 +150,12 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setRenderCutoff: () => {
       throw new Error("No renderCutoffSetter provided")
+    },
+    setMinBubbleSize: () => {
+      throw new Error("No minBubbleSizeSetter provided")
+    },
+    setMaxBubbleSize: () => {
+      throw new Error("No maxBubbleSizeSetter provided")
     },
     setShowFilesWithoutChanges: () => {
       throw new Error("No showFilesWithoutChangesSetter provided")

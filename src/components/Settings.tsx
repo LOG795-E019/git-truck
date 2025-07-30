@@ -3,6 +3,7 @@ import { useOptions } from "../contexts/OptionsContext"
 import { useTheme } from "~/styling"
 import Icon from "@mdi/react"
 import {
+  mdiChartBubble,
   mdiClockEdit,
   mdiCog,
   mdiContentCut,
@@ -38,11 +39,14 @@ export function CollapsableSettings() {
 
 export function Settings() {
   const {
+    chartType,
     metricType,
     groupingType,
     hierarchyType,
     transitionsEnabled,
     renderCutoff,
+    minBubbleSize,
+    maxBubbleSize,
     showFilesWithoutChanges,
     showFilesWithNoJSONRules,
     linkMetricAndSizeMetric,
@@ -53,6 +57,8 @@ export function Settings() {
     setHierarchyType,
     setSizeMetricType,
     setRenderCutoff,
+    setMinBubbleSize,
+    setMaxBubbleSize,
     setShowFilesWithoutChanges,
     setShowFilesWithNoJSONRules
   } = useOptions()
@@ -153,6 +159,46 @@ export function Settings() {
           onChange={(x) => startTransition(() => setRenderCutoff(x.target.valueAsNumber))}
         />
       </label>
+      {chartType === "AUTHOR_GRAPH" && (
+        <>
+          <label
+            className="label flex w-full items-center justify-start gap-2 text-sm"
+            title="Increase this to increase the size of the smallest bubble"
+          >
+            <span className="flex grow items-center gap-2">
+              <Icon className="ml-1.5" path={mdiChartBubble} size="1.25em" />
+              Minimum Bubble Size {isTransitioning ? <img src={anitruck} alt="..." className="h-5" /> : ""}
+            </span>
+            <input
+              type="number"
+              min={0.01}
+              max={0.5}
+              step={0.01}
+              defaultValue={minBubbleSize}
+              className="mr-1 w-12 place-self-end border-b-2"
+              onChange={(x) => startTransition(() => setMinBubbleSize(x.target.valueAsNumber))}
+            />
+          </label>
+          <label
+            className="label flex w-full items-center justify-start gap-2 text-sm"
+            title="Increase this to increase the size of the biggest bubble"
+          >
+            <span className="flex grow items-center gap-2">
+              <Icon className="ml-1.5" path={mdiChartBubble} size="1.25em" />
+              Maximum Bubble Size {isTransitioning ? <img src={anitruck} alt="..." className="h-5" /> : ""}
+            </span>
+            <input
+              type="number"
+              min={0.5}
+              max={5}
+              step={0.1}
+              defaultValue={maxBubbleSize}
+              className="mr-1 w-12 place-self-end border-b-2"
+              onChange={(x) => startTransition(() => setMaxBubbleSize(x.target.valueAsNumber))}
+            />
+          </label>
+        </>
+      )}
     </>
   )
 }
