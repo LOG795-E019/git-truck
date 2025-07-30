@@ -39,6 +39,7 @@ export function CollapsableSettings() {
 export function Settings() {
   const {
     metricType,
+    groupingType,
     hierarchyType,
     transitionsEnabled,
     renderCutoff,
@@ -101,15 +102,17 @@ export function Settings() {
         <Icon className="ml-1.5" path={mdiClockEdit} size="1.25em" />
         Show files with no activity
       </CheckboxWithLabel>
-      <CheckboxWithLabel
-        className="text-sm"
-        checked={showFilesWithNoJSONRules}
-        onChange={(e) => setShowFilesWithNoJSONRules(e.target.checked)}
-        title="Show files that have no JSON rules applied to them"
-      >
-        <Icon className="ml-1.5" path={mdiTextBoxRemove} size="1.25em" />
-        Show files with no JSON rules
-      </CheckboxWithLabel>
+      {groupingType === "JSON_RULES" && (
+        <CheckboxWithLabel
+          className="text-sm"
+          checked={showFilesWithNoJSONRules}
+          onChange={(e) => setShowFilesWithNoJSONRules(e.target.checked)}
+          title="Show files that have no JSON rules applied to them"
+        >
+          <Icon className="ml-1.5" path={mdiTextBoxRemove} size="1.25em" />
+          Show files with no JSON rules
+        </CheckboxWithLabel>
+      )}
       <CheckboxWithLabel
         className="text-sm"
         checked={hierarchyType === "FLAT"}
