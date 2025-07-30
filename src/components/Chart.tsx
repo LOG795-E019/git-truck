@@ -35,7 +35,6 @@ import { cn, usePrefersLightMode } from "~/styling"
 import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
 import { createHash } from "crypto"
 import fileTypeRulesJSON from "./fileTypeRules.json"
-import { getCoAuthors } from "~/analyzer/coauthors.server"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -53,7 +52,8 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
     labelsVisible,
     renderCutoff,
     minBubbleSize,
-    maxBubbleSize
+    maxBubbleSize,
+    selectedAuthors
   } = useOptions()
   const { path } = usePath()
   const { clickedObject, setClickedObject } = useClickedObject()
@@ -114,11 +114,23 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       renderCutoff,
       minBubbleSize,
       maxBubbleSize,
-      showFilesWithNoJSONRules
+      showFilesWithNoJSONRules,
+      selectedAuthors
     ).descendants()
     console.timeEnd("nodes")
     return res
-  }, [size, chartType, sizeMetric, path, renderCutoff, minBubbleSize, maxBubbleSize, databaseInfo, filetree])
+  }, [
+    size,
+    chartType,
+    sizeMetric,
+    path,
+    renderCutoff,
+    minBubbleSize,
+    maxBubbleSize,
+    databaseInfo,
+    filetree,
+    selectedAuthors
+  ])
 
   useEffect(() => {
     setHoveredObject(null)
@@ -553,7 +565,8 @@ function createPartitionedHiearchy(
   renderCutoff: number,
   minBubbleSize: number,
   maxBubbleSize: number,
-  showFilesWithNoJSONRules: boolean
+  showFilesWithNoJSONRules: boolean,
+  selectedAuthors: string[]
 ) {
   let currentTree = tree
   const steps = path.substring(tree.name.length + 1).split("/")
@@ -649,7 +662,8 @@ function createPartitionedHiearchy(
       currentTree,
       sizeMetricType,
       minBubbleSize,
-      maxBubbleSize
+      maxBubbleSize,
+      selectedAuthors
     )
 
     // Apply a custom sum function that gives each author a fixed size
@@ -929,12 +943,15 @@ function createAuthorNetworkHierarchy(
   tree: GitTreeObject,
   sizeMetricType: string,
   minBubbleSize: number,
-  maxBubbleSize: number
+  maxBubbleSize: number,
+  selectedAuthors: string[]
 ): HierarchyNode<GitObject> {
   const fixedAuthorSize = 1000
 
-  // Get all authors and their total stats
-  const authorEntries = Object.entries(databaseInfo.authorsTotalStats)
+  // Get all authors and their total stats, filtered by selected authors
+  const authorEntries = Object.entries(databaseInfo.authorsTotalStats).filter(([author]) =>
+    selectedAuthors.includes(author)
+  )
 
   // Get all values for scaling
   const allValues = authorEntries.map(

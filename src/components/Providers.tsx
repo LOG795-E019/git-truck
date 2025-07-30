@@ -184,6 +184,11 @@ export function Providers({ children, data }: ProvidersProps) {
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           linkMetricAndSizeMetric: link
+        })),
+      setSelectedAuthors: (selectedAuthors: string[]) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          selectedAuthors
         }))
     }),
     [options, submit]

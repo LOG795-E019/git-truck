@@ -4,7 +4,9 @@ import { EnumSelect } from "./EnumSelect"
 import type { ChartType } from "../contexts/OptionsContext"
 import { Chart, useOptions } from "../contexts/OptionsContext"
 import { Icon } from "@mdi/react"
-import { memo } from "react"
+import { memo, useState, useEffect, useRef, useMemo } from "react"
+import { useData } from "~/contexts/DataContext"
+import { CheckboxWithLabel } from "~/components/util"
 
 import {
   mdiChartBubble,
@@ -23,7 +25,8 @@ import {
   mdiFolder,
   mdiGroup,
   mdiTextBox,
-  mdiAccountMultiple
+  mdiAccountMultiple,
+  mdiFilter
 } from "@mdi/js"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
@@ -48,8 +51,50 @@ export const Options = memo(function Options() {
     setMetricType,
     setChartType,
     setSizeMetricType,
-    setGroupingType
+    setGroupingType,
+    selectedAuthors,
+    setSelectedAuthors
   } = useOptions()
+
+  const { databaseInfo } = useData()
+  const [showAuthorFilter, setShowAuthorFilter] = useState(false)
+  const [searchFilter, setSearchFilter] = useState("")
+  const [minCommits, setMinCommits] = useState<number | undefined>(undefined)
+  const [maxCommits, setMaxCommits] = useState<number | undefined>(undefined)
+  const [minLineChanges, setMinLineChanges] = useState<number | undefined>(undefined)
+  const [maxLineChanges, setMaxLineChanges] = useState<number | undefined>(undefined)
+  const initializedRef = useRef(false)
+
+  // Get all authors from database
+  const allAuthors = Object.keys(databaseInfo?.authorsTotalStats || {})
+
+  // Initialize selected authors only once, not on every change
+  useEffect(() => {
+    if ((!selectedAuthors || selectedAuthors.length === 0) && !initializedRef.current && allAuthors.length > 0) {
+      setSelectedAuthors(allAuthors)
+      initializedRef.current = true
+    }
+  }, [allAuthors, selectedAuthors, setSelectedAuthors])
+
+  // Filtered authors based on search term
+  const filteredAuthors = allAuthors
+    .filter((author) => author.toLowerCase().includes(searchFilter.toLowerCase()))
+    .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+
+  // Apply numeric filters to filtered authors
+  const numericFilteredAuthors = useMemo(() => {
+    return filteredAuthors.filter((author) => {
+      const stats = databaseInfo?.authorsTotalStats[author]
+      if (!stats) return false
+
+      if (minCommits !== undefined && stats.nb_commits < minCommits) return false
+      if (maxCommits !== undefined && stats.nb_commits > maxCommits) return false
+      if (minLineChanges !== undefined && stats.nb_line_change < minLineChanges) return false
+      if (maxLineChanges !== undefined && stats.nb_line_change > maxLineChanges) return false
+
+      return true
+    })
+  }, [filteredAuthors, minCommits, maxCommits, minLineChanges, maxLineChanges, databaseInfo?.authorsTotalStats])
 
   const visualizationIcons: Record<MetricType, string> = {
     FILE_TYPE: mdiFileCodeOutline,
@@ -78,6 +123,36 @@ export const Options = memo(function Options() {
     BUBBLE_CHART: mdiChartBubble,
     TREE_MAP: mdiChartTree,
     AUTHOR_GRAPH: mdiAccountNetwork
+  }
+
+  // Toggle author selection
+  const toggleAuthor = (author: string) => {
+    if (selectedAuthors.includes(author)) {
+      setSelectedAuthors(selectedAuthors.filter((a) => a !== author))
+    } else {
+      setSelectedAuthors([...selectedAuthors, author])
+    }
+  }
+
+  // Replace toggleAllVisible with separate functions
+  const selectAllVisible = () => {
+    // Select all visible authors
+    const newSelection = [...new Set([...selectedAuthors, ...numericFilteredAuthors])]
+    setSelectedAuthors(newSelection)
+  }
+
+  const deselectAllVisible = () => {
+    // Deselect all visible authors
+    setSelectedAuthors(selectedAuthors.filter((author) => !numericFilteredAuthors.includes(author)))
+  }
+
+  // Reset all filters
+  const resetFilters = () => {
+    setMinCommits(undefined)
+    setMaxCommits(undefined)
+    setMinLineChanges(undefined)
+    setMaxLineChanges(undefined)
+    setSearchFilter("")
   }
 
   return (
@@ -140,6 +215,202 @@ export const Options = memo(function Options() {
             iconMap={groupingTypeIcons}
           />
         </fieldset>
+
+        {/* Author Filter Section */}
+        {chartType === "AUTHOR_GRAPH" && (
+          <fieldset className="mt-2 rounded-lg border p-2">
+            <legend className="card__title ml-1.5 justify-start gap-2">
+              <Icon path={mdiFilter} size="1.25em" />
+              Author Filter
+              <button className="btn btn-xs ml-auto" onClick={() => setShowAuthorFilter(!showAuthorFilter)}>
+                {showAuthorFilter ? "Hide" : "Show"}
+              </button>
+            </legend>
+
+            {showAuthorFilter && (
+              <div className="mt-2 flex flex-col gap-2">
+                {/* Select/Deselect buttons */}
+                <div className="flex items-center gap-2">
+                  <button className="btn btn-xs flex-1" onClick={selectAllVisible} title="Select all visible authors">
+                    Select All Visible
+                  </button>
+                  <button
+                    className="btn btn-xs flex-1"
+                    onClick={deselectAllVisible}
+                    title="Deselect all visible authors"
+                  >
+                    Deselect All Visible
+                  </button>
+                </div>
+
+                {/* Search authors box */}
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-grow">
+                    <input
+                      type="text"
+                      className="input w-full pr-8"
+                      placeholder="Search authors..."
+                      value={searchFilter}
+                      onChange={(e) => setSearchFilter(e.target.value)}
+                    />
+                    {searchFilter && (
+                      <button
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                        onClick={() => setSearchFilter("")}
+                        title="Clear search"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Numeric filter inputs */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col">
+                    <label className="text-xs font-medium">Commits</label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        className="input input-xs w-full"
+                        placeholder="Min"
+                        min={0}
+                        value={minCommits ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value ? Number(e.target.value) : undefined
+                          // If max is defined, ensure min doesn't exceed max
+                          if (value !== undefined && maxCommits !== undefined && value > maxCommits) {
+                            setMaxCommits(value)
+                          }
+                          setMinCommits(value)
+                        }}
+                      />
+                      <span className="text-xs text-gray-500">to</span>
+                      <input
+                        type="number"
+                        className="input input-xs w-full"
+                        placeholder="Max"
+                        min={minCommits ?? 0}
+                        value={maxCommits ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value ? Number(e.target.value) : undefined
+                          // If min is defined, ensure max isn't less than min
+                          if (value !== undefined && minCommits !== undefined && value < minCommits) {
+                            setMinCommits(value)
+                          }
+                          setMaxCommits(value)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-xs font-medium">Line Changes</label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        className="input input-xs w-full"
+                        placeholder="Min"
+                        min={0}
+                        step={10}
+                        value={minLineChanges ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value ? Number(e.target.value) : undefined
+                          // If max is defined, ensure min doesn't exceed max
+                          if (value !== undefined && maxLineChanges !== undefined && value > maxLineChanges) {
+                            setMaxLineChanges(value)
+                          }
+                          setMinLineChanges(value)
+                        }}
+                      />
+                      <span className="text-xs text-gray-500">to</span>
+                      <input
+                        type="number"
+                        className="input input-xs w-full"
+                        placeholder="Max"
+                        min={minLineChanges ?? 0}
+                        value={maxLineChanges ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value ? Number(e.target.value) : undefined
+                          // If min is defined, ensure max isn't less than min
+                          if (value !== undefined && minLineChanges !== undefined && value < minLineChanges) {
+                            setMinLineChanges(value)
+                          }
+                          setMaxLineChanges(value)
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reset filters button - always shown */}
+                <button
+                  className="btn btn-xs w-full"
+                  onClick={resetFilters}
+                  disabled={!minCommits && !maxCommits && !minLineChanges && !maxLineChanges && !searchFilter}
+                >
+                  Reset All Filters
+                </button>
+
+                {/* Author list as a table */}
+                <div className="max-h-60 overflow-y-auto rounded border p-2">
+                  {numericFilteredAuthors.length > 0 ? (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b-2 text-xs text-gray-500">
+                          <th className="w-8 pb-1 text-left">✓</th>
+                          <th className="pb-1 text-left">Author</th>
+                          <th className="pb-1 text-right">Commits</th>
+                          <th className="pb-1 text-right">Changes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {numericFilteredAuthors.map((author, index) => {
+                          const stats = databaseInfo?.authorsTotalStats[author]
+                          return (
+                            <tr
+                              key={author}
+                              className={`
+                                hover:bg-gray-100 dark:hover:bg-gray-700
+                                ${index < numericFilteredAuthors.length - 1 ? "border-b border-gray-200 dark:border-gray-700" : ""}
+                              `}
+                              onClick={() => toggleAuthor(author)}
+                            >
+                              <td className="py-1 align-middle">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAuthors.includes(author)}
+                                  onChange={(e) => {
+                                    e.stopPropagation()
+                                    toggleAuthor(author)
+                                  }}
+                                  className="checkbox checkbox-sm"
+                                />
+                              </td>
+                              <td className="py-1">{author}</td>
+                              <td className="py-1 text-right text-xs text-gray-500">
+                                {stats?.nb_commits.toLocaleString() || 0}
+                              </td>
+                              <td className="py-1 text-right text-xs text-gray-500">
+                                {stats?.nb_line_change.toLocaleString() || 0}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="text-center text-gray-500">No authors found</p>
+                  )}
+                </div>
+
+                <div className="text-sm text-gray-500">
+                  {selectedAuthors.length} of {allAuthors.length} authors selected,
+                  {numericFilteredAuthors.length} shown
+                </div>
+              </div>
+            )}
+          </fieldset>
+        )}
       </div>
     </>
   )
