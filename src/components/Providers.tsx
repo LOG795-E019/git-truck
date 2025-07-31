@@ -189,6 +189,11 @@ export function Providers({ children, data }: ProvidersProps) {
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           selectedAuthors
+        })),
+      setSelectedFiles: (selectedFiles: string[]) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          selectedFiles
         }))
     }),
     [options, submit]

@@ -56,6 +56,7 @@ export type Options = {
   dominantAuthorCutoff: number
   linkMetricAndSizeMetric: boolean
   selectedAuthors: string[]
+  selectedFiles: string[]
 }
 
 export type OptionsContextType = Options & {
@@ -78,6 +79,7 @@ export type OptionsContextType = Options & {
   setDominantAuthorCutoff: (dominantAuthorCutoff: number) => void
   setLinkMetricAndSizeMetric: (link: boolean) => void
   setSelectedAuthors: (authors: string[]) => void
+  setSelectedFiles: (files: string[]) => void
 }
 
 export const OptionsContext = createContext<OptionsContextType | undefined>(undefined)
@@ -111,7 +113,8 @@ const defaultOptions: Options = {
   showFilesWithNoJSONRules: false,
   dominantAuthorCutoff: 0,
   linkMetricAndSizeMetric: false,
-  selectedAuthors: []
+  selectedAuthors: [],
+  selectedFiles: []
 }
 
 export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {}): OptionsContextType {
@@ -174,6 +177,9 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setSelectedAuthors: () => {
       throw new Error("No setSelectedAuthorsSetter provided")
+    },
+    setSelectedFiles: () => {
+      throw new Error("No setSelectedFilesSetter provided")
     }
   }
 }
