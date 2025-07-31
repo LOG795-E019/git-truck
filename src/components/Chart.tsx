@@ -194,6 +194,13 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
 
             // Get relationships map
             const relationshipsMap = getAuthorsRelationships(databaseInfo)
+
+            // Extract unique array of authors from relationshipsMap
+            const authorsInRelationshipMap = Array.from(new Set([
+              ...Object.keys(relationshipsMap),
+              ...Object.values(relationshipsMap).flatMap(rel => Object.keys(rel.Relationships))
+            ]))
+
             // Get author colors
             const [, authorColors] = useMetrics()
 
@@ -212,11 +219,12 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                 // Avoid division by zero
                 const author1Percent = totalValue > 0 ? author1Value / totalValue : 0
                 const author2Percent = totalValue > 0 ? author2Value / totalValue : 0
-
+              
                 // Scale thickness (adjust base and scaling as needed)
-                const baseWidth = Math.max(2, Math.log(totalValue + 1))
-                const strokeWidth1 = baseWidth * author1Percent * 1.5
-                const strokeWidth2 = baseWidth * author2Percent * 1.5
+                const multiplier = searched_Stat === "nb_commits" ? 10 : 1
+                const baseWidth = Math.max(2, Math.log(totalValue * multiplier + 1)) * (20 / authorsInRelationshipMap.length)
+                const strokeWidth1 = baseWidth * author1Percent
+                const strokeWidth2 = baseWidth * author2Percent
                 const color1 = authorColors.get(author1) || "#888"
                 const color2 = authorColors.get(author2) || "#888"
 
