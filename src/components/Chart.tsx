@@ -251,6 +251,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                 const x2b = pos2.x - perpX * offsetB
                 const y2b = pos2.y - perpY * offsetB
 
+                // ...existing code...
                 return [
                   <line
                     key={`rel-${author1}-${author2}-1`}
@@ -261,6 +262,18 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                     stroke={color1}
                     strokeWidth={strokeWidth1}
                     opacity={0.7}
+                    className="cursor-pointer transition-opacity hover:opacity-100"
+                    onMouseEnter={() => {
+                      const tooltipContent = {
+                        type: 'blob', // Use existing type
+                        name: `${author1} ↔ ${author2} : ${searched_Stat}: ${totalValue}`,
+                        path: `relationship-${author1}-${author2}`,
+                        sizeInBytes: totalValue, // Use existing property that tooltip reads
+                        // Add any other properties your tooltip expects
+                      }
+                      setHoveredObject(tooltipContent as any)
+                    }}
+                    onMouseLeave={() => setHoveredObject(null)}
                   />,
                   <line
                     key={`rel-${author1}-${author2}-2`}
@@ -271,6 +284,18 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                     stroke={color2}
                     strokeWidth={strokeWidth2}
                     opacity={0.7}
+                    className="cursor-pointer transition-opacity hover:opacity-100"
+                    onMouseEnter={() => {
+                      const tooltipContent = {
+                        type: 'blob', // Use existing type
+                        name: `${author1} ↔ ${author2} : ${searched_Stat}: ${totalValue}`,
+                        path: `relationship-${author1}-${author2}`,
+                        sizeInBytes: totalValue, // Use existing property that tooltip reads
+                        // Add any other properties your tooltip expects
+                      }
+                      setHoveredObject(tooltipContent as any)
+                    }}
+                    onMouseLeave={() => setHoveredObject(null)}
                   />
                 ]
               })
