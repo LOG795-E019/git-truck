@@ -692,21 +692,29 @@ export default class DB {
   }
 
   private getTimeStringFormat(timerange: [number, number]) {
-    const durationDays = (timerange[1] - timerange[0]) / (60 * 60 * 24)
-    if (durationDays < 150) return ["%a %-d %B %Y", "day"]
-    if (durationDays < 1000) return ["Week %V %Y", "week"]
-    if (durationDays < 4000) return ["%B %Y", "month"]
-    return ["%Y", "year"]
+    const durationDays = (timerange[1] - timerange[0]) / (60 * 60 * 24);
+    if (durationDays <= 90) return ["%a %-d %B %Y", "day"];
+    if (durationDays <= 1000) return ["Week %V %Y", "week"];
+    if (durationDays < 4000) return ["%B %Y", "month"];
+    return ["%Y", "year"];
   }
 
   public async getCommitCountPerTime(timerange: [number, number]) {
     const [query, timeUnit] = this.getTimeStringFormat(timerange)
     const res = await this.query(`
-      SELECT strftime(date, '${query}') as timestring, count(*) AS count, MIN(committertime) AS ct FROM (SELECT date_trunc('${timeUnit}',to_timestamp(committertime)) AS date, committertime FROM commits) GROUP BY date ORDER BY date ASC;
+      SELECT strftime(date, '${query}') as timestring, count(*) AS count, MIN(committertime) AS ct 
+      FROM (
+        SELECT date_trunc('${timeUnit}', to_timestamp(committertime)) AS date, committertime 
+        FROM commits 
+        WHERE committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+      ) 
+      GROUP BY date 
+      ORDER BY date ASC;
     `)
     const mapped = res.map((x) => {
       return { date: x["timestring"] as string, count: Number(x["count"]), timestamp: Number(x["ct"]) }
     })
+
     const final: {
       date: string
       count: number
@@ -718,6 +726,49 @@ export default class DB {
       if (existing) final.push(existing)
       else final.push({ date: dateString, count: 0, timestamp })
     }
+    const sorted = final.sort((a, b) => a.timestamp - b.timestamp)
+    return sorted
+  }
+
+  public async getLineChangePerTime(timerange: [number, number]) {
+    const [query, timeUnit] = this.getTimeStringFormat(timerange)
+    const res = await this.query(`
+      SELECT strftime(date, '${query}') as timestring, 
+            SUM(insertions + deletions) AS total_changes, 
+            MIN(committertime) AS ct 
+      FROM (
+        SELECT date_trunc('${timeUnit}', to_timestamp(fc.committertime)) AS date, 
+              fc.committertime,
+              fc.insertions,
+              fc.deletions
+        FROM filechanges_commits_renamed_cached fc
+        WHERE fc.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+      ) 
+      GROUP BY date 
+      ORDER BY date ASC;
+    `)
+    
+    const mapped = res.map((x) => {
+      return { 
+        date: x["timestring"] as string, 
+        count: Number(x["total_changes"]), 
+        timestamp: Number(x["ct"]) 
+      }
+    })
+
+    const final: {
+      date: string
+      count: number
+      timestamp: number
+    }[] = []
+    
+    const allIntervals = getTimeIntervals(timeUnit, timerange[0], timerange[1])
+    for (const [dateString, timestamp] of allIntervals) {
+      const existing = mapped.find((x) => x.date === dateString)
+      if (existing) final.push(existing)
+      else final.push({ date: dateString, count: 0, timestamp })
+    }
+    
     const sorted = final.sort((a, b) => a.timestamp - b.timestamp)
     return sorted
   }
