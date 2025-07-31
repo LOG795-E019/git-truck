@@ -44,7 +44,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   const { searchResults } = useSearch()
   const size = useDeferredValue(rawSize)
   const { databaseInfo } = useData()
-  const { chartType, sizeMetric, groupingType, depthType, hierarchyType, labelsVisible, renderCutoff, selectedFilePaths, selectedAuthorNames } = useOptions() // Add selectedAuthorNames
+  const { chartType, sizeMetric, groupingType, depthType, hierarchyType, labelsVisible, renderCutoff, selectedFilePaths } = useOptions() // Remove selectedAuthorNames
   const { path } = usePath()
   const { clickedObject, setClickedObject } = useClickedObject()
   const { setPath } = usePath()
@@ -103,12 +103,11 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       path,
       renderCutoff,
       showFilesWithNoJSONRules,
-      selectedFilePaths,
-      selectedAuthorNames // Add this parameter
+      selectedFilePaths
     ).descendants()
     console.timeEnd("nodes")
     return res
-  }, [size, chartType, sizeMetric, groupingType, path, renderCutoff, databaseInfo, filetree, selectedFilePaths, selectedAuthorNames]) // Add selectedAuthorNames to dependencies
+  }, [size, chartType, sizeMetric, groupingType, path, renderCutoff, databaseInfo, filetree, selectedFilePaths]) // Remove selectedAuthorNames from dependencies
 
   useEffect(() => {
     setHoveredObject(null)
@@ -122,6 +121,13 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       ? {
           onClick: (evt) => {
             evt.stopPropagation()
+            
+            // For FILE_AUTHORS grouping, author bubbles should show details
+            if (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) {
+              return setClickedObject(d.data)
+            }
+            
+            // For other cases, show details
             return setClickedObject(d.data)
           },
           onMouseOver: () => setHoveredObject(d.data as GitObject),
@@ -129,24 +135,38 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
         }
       : {
           onClick: (evt) => {
+            evt.stopPropagation()
+            
             if (isRoot) {
-              // Handle root clicks
-              evt.stopPropagation()
-              const parentPath = path.split("/").slice(0, -1).join("/")
-              if (parentPath === "") setPath("/")
-              else setPath(parentPath)
-            } else {
-              // Handle non-root clicks
-              evt.stopPropagation()
-              
-              // For FILE_AUTHORS grouping, author bubbles should be clickable
-              if (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) {
-                setClickedObject(d.data)
-              } else if (isTree(d.data)) {
-                // Regular tree navigation
-                setPath(d.data.path)
+              // Handle root clicks - zoom out
+              if (groupingType === "FILE_AUTHORS") {
+                // For FILE_AUTHORS, zooming out means going back to multi-file view
+                setPath("/")
               } else {
-                // Regular file clicks
+                // Regular zoom out logic
+                const parentPath = path.split("/").slice(0, -1).join("/")
+                if (parentPath === "") setPath("/")
+                else setPath(parentPath)
+              }
+            } else {
+              // Handle non-root clicks for tree elements
+              
+              // Special handling for FILE_AUTHORS grouping
+              if (groupingType === "FILE_AUTHORS" && selectedFilePaths.length > 1) {
+                // For FILE_AUTHORS with multiple files, clicking a file container zooms to that file
+                if (isTree(d.data) && !d.data.path.includes("/@")) {
+                  console.log("FILE_AUTHORS: Zooming into file:", d.data.path)
+                  setPath(d.data.path)
+                }
+              }
+              // Regular tree navigation for other groupings
+              else if (groupingType !== "FILE_AUTHORS" && isTree(d.data)) {
+                console.log("Regular tree zoom:", d.data.path)
+                setPath(d.data.path)
+              }
+              // If none of the zoom conditions are met, show details
+              else {
+                console.log("No zoom, showing details for:", d.data.path)
                 setClickedObject(d.data)
               }
             }
@@ -269,8 +289,22 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
           <g
             key={d.data.path}
             className={clsx("transition-opacity hover:opacity-60", {
-              "cursor-pointer": i === 0,
-              "cursor-zoom-in": i > 0 && isTree(d.data),
+              // Root element always has pointer cursor OR non-root clickable elements
+              "cursor-pointer": i === 0 || (i > 0 && !isTree(d.data) && (
+                // Show pointer cursor for author bubbles in FILE_AUTHORS mode
+                (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) ||
+                // Show pointer cursor for blobs in other modes
+                (groupingType !== "FILE_AUTHORS")
+              )),
+              
+              // Non-root elements - prioritize zoom cursor over pointer cursor
+              "cursor-zoom-in": i > 0 && isTree(d.data) && (
+                // Show zoom cursor for file containers in FILE_AUTHORS mode
+                (groupingType === "FILE_AUTHORS" && selectedFilePaths.length > 1 && !d.data.path.includes("/@")) ||
+                // Show zoom cursor for regular tree navigation
+                (groupingType !== "FILE_AUTHORS" && isTree(d.data))
+              ),
+              
               "animate-blink": clickedObject?.path === d.data.path
             })}
             {...createGroupHandlers(d, i === 0)}
@@ -563,8 +597,7 @@ function createPartitionedHiearchy(
   path: string,
   renderCutoff: number,
   showFilesWithNoJSONRules: boolean,
-  selectedFilePaths: string[],
-  selectedAuthorNames: string[] // Add this parameter
+  selectedFilePaths: string[]
 ) {
   let currentTree = tree
   const steps = path.substring(tree.name.length + 1).split("/")
@@ -623,78 +656,59 @@ function createPartitionedHiearchy(
       }
       castedTree = fileAuthorRoot as GitObject
     } else {
-      // Multiple files: create file bubbles containing author bubbles
-      const fileNodes: GitTreeObject[] = selectedFilePaths.map(filePath => {
-        const authorNodes = createAuthorNodesForFile(databaseInfo, filePath, sizeMetricType)
-        
-        return {
-          type: "tree",
-          name: filePath.split('/').pop() || filePath,
-          path: filePath,
-          children: authorNodes,
-          hash: hashString("file-authors-" + filePath)
-        }
-      })
+      // Multiple files: handle zoom state
+      if (path === "/" || path === "") {
+        // Show all files as containers
+        const fileNodes: GitTreeObject[] = selectedFilePaths.map(filePath => {
+          const authorNodes = createAuthorNodesForFile(databaseInfo, filePath, sizeMetricType)
+          
+          return {
+            type: "tree",
+            name: filePath.split('/').pop() || filePath,
+            path: filePath,
+            children: authorNodes,
+            hash: hashString("file-authors-" + filePath)
+          }
+        })
 
-      const multiFileRoot: GitTreeObject = {
-        type: "tree",
-        name: "File Authors View",
-        path: "/",
-        children: fileNodes,
-        hash: hashString("multi-file-authors-" + selectedFilePaths.join(","))
-      }
-      castedTree = multiFileRoot as GitObject
-    }
-  } else if (groupingType === "AUTHOR_FILES") {
-    
-    if (selectedAuthorNames.length === 0) {
-      // Return empty hierarchy if no authors are selected
-      const emptyRoot: GitTreeObject = {
-        type: "tree",
-        name: "Select authors to view their files",
-        path: "/",
-        children: [],
-        hash: hashString("no-authors-selected")
-      }
-      castedTree = emptyRoot as GitObject
-    } else if (selectedAuthorNames.length === 1) {
-      // Single author: show files directly as bubbles
-      const authorName = selectedAuthorNames[0]
-      const fileNodes = createFileNodesForAuthor(databaseInfo, authorName, sizeMetricType)
-      
-      const authorFileRoot: GitTreeObject = {
-        type: "tree",
-        name: `Files by ${authorName}`,
-        path: `/@${authorName}`,
-        children: fileNodes,
-        hash: hashString("author-files-" + authorName)
-      }
-      castedTree = authorFileRoot as GitObject
-    } else {
-      // Multiple authors: create author bubbles containing file bubbles
-      const authorNodes: GitTreeObject[] = selectedAuthorNames.map(authorName => {
-        const fileNodes = createFileNodesForAuthor(databaseInfo, authorName, sizeMetricType)
-        
-        return {
+        const multiFileRoot: GitTreeObject = {
           type: "tree",
-          name: authorName,
-          path: `/@${authorName}`,
+          name: "File Authors View",
+          path: "/",
           children: fileNodes,
-          hash: hashString("author-files-" + authorName)
+          hash: hashString("multi-file-authors-" + selectedFilePaths.join(","))
         }
-      })
-
-      const multiAuthorRoot: GitTreeObject = {
-        type: "tree",
-        name: "Author Files View",
-        path: "/",
-        children: authorNodes,
-        hash: hashString("multi-author-files-" + selectedAuthorNames.join(","))
+        castedTree = multiFileRoot as GitObject
+      } else {
+        // Zoomed into a specific file - show only that file's authors
+        const zoomedFilePath = path
+        if (selectedFilePaths.includes(zoomedFilePath)) {
+          const authorNodes = createAuthorNodesForFile(databaseInfo, zoomedFilePath, sizeMetricType)
+          
+          const zoomedFileRoot: GitTreeObject = {
+            type: "tree",
+            name: `Authors of ${zoomedFilePath.split('/').pop()}`,
+            path: zoomedFilePath,
+            children: authorNodes,
+            hash: hashString("file-authors-zoomed-" + zoomedFilePath)
+          }
+          castedTree = zoomedFileRoot as GitObject
+        } else {
+          // Invalid path, fall back to multi-file view
+          // Return empty hierarchy and let the parent component handle path correction
+          const emptyRoot: GitTreeObject = {
+            type: "tree",
+            name: "Invalid path - please select valid files",
+            path: "/",
+            children: [],
+            hash: hashString("invalid-path")
+          }
+          castedTree = emptyRoot as GitObject
+        }
       }
-      castedTree = multiAuthorRoot as GitObject
     }
   } else {
-    // For non-AUTHOR_FILES and non-FILE_AUTHORS groupings, use the existing logic
+    // For non-FILE_AUTHORS groupings, use the existing logic
     castedTree = currentTree as GitObject
   }
   
@@ -1146,72 +1160,6 @@ function createAuthorNodesForFile(
       name: author,
       path: `${filePath}/@${author}`,
       hash: hashString(`file-author-${author}-${index}-${filePath}`),
-      contributionCount: contribution,
-      sizeInBytes: scaledSize * 1000,
-      size: scaledSize * 1000
-    }
-  })
-}
-
-// Helper function to create file nodes for a specific author
-function createFileNodesForAuthor(
-  databaseInfo: DatabaseInfo, 
-  authorName: string, 
-  sizeMetricType: SizeMetricType
-): GitBlobObject[] {
-  const authorFiles: Array<{ filePath: string; contribution: number }> = []
-  
-  // Get all files this author has worked on
-  const authorFileStats = databaseInfo.authorsFilesStats[authorName]
-  if (!authorFileStats) return []
-
-  Object.entries(authorFileStats).forEach(([filePath, fileStats]) => {
-    let contribution = 0
-    switch (sizeMetricType) {
-      case "MOST_COMMITS":
-        contribution = fileStats.nb_commits || 0
-        break
-      case "MOST_CONTRIBS":
-        contribution = fileStats.nb_line_change || 0
-        break
-      case "EQUAL_SIZE":
-        contribution = 1000 // Fixed value for all files
-        break
-      case "FILE_SIZE":
-      case "LAST_CHANGED":
-        // Default to line changes for author context
-        contribution = fileStats.nb_line_change || 0
-        break
-    }
-    
-    if (contribution > 0) {
-      authorFiles.push({ filePath, contribution })
-    }
-  })
-
-  // Sort by contribution (largest first)
-  authorFiles.sort((a, b) => b.contribution - a.contribution)
-
-  // Calculate total for scaling
-  const totalContribution = authorFiles.reduce((sum, item) => sum + item.contribution, 0)
-
-  return authorFiles.map(({ filePath, contribution }, index) => {
-    // For EQUAL_SIZE, all files should have the same normalized size
-    const normalizedSize = sizeMetricType === "EQUAL_SIZE"
-      ? 1 / authorFiles.length  // Equal distribution
-      : totalContribution > 0 ? contribution / totalContribution : 0
-
-    const minSize = 0.3
-    const maxSize = 2.0
-    const scaledSize = sizeMetricType === "EQUAL_SIZE"
-      ? 1.0  // Fixed size for equal
-      : minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
-
-    return {
-      type: "blob",
-      name: filePath.split('/').pop() || filePath,
-      path: filePath,
-      hash: hashString(`author-file-${authorName}-${index}-${filePath}`),
       contributionCount: contribution,
       sizeInBytes: scaledSize * 1000,
       size: scaledSize * 1000

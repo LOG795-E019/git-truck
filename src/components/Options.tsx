@@ -6,7 +6,6 @@ import { Chart, useOptions } from "../contexts/OptionsContext"
 import { Icon } from "@mdi/react"
 import { memo, useMemo } from "react"
 import { FileSelector } from "src/components/FileSelector"
-import { AuthorSelector } from "./AuthorSelector"
 
 import {
   mdiChartBubble,
@@ -24,8 +23,7 @@ import {
   mdiPlusMinusVariant,
   mdiFolder,
   mdiGroup,
-  mdiTextBox,
-  mdiAccountBox
+  mdiTextBox
 } from "@mdi/js"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
@@ -51,8 +49,7 @@ export const Options = memo(function Options() {
     setChartType,
     setSizeMetricType,
     setGroupingType,
-    setSelectedFilePaths,
-    setSelectedAuthorNames
+    setSelectedFilePaths
   } = useOptions()
 
   const visualizationIcons: Record<MetricType, string> = {
@@ -100,8 +97,7 @@ export const Options = memo(function Options() {
     FILE_TYPE: mdiFileCodeOutline,
     FOLDER_NAME: mdiFolder,
     JSON_RULES: mdiTextBox,
-    FILE_AUTHORS: mdiAccountNetwork,
-    AUTHOR_FILES: mdiAccountBox // Add this icon
+    FILE_AUTHORS: mdiAccountNetwork
   }
 
   const chartTypeIcons: Record<ChartType, string> = {
@@ -179,9 +175,6 @@ export const Options = memo(function Options() {
               if (newGroupingType !== "FILE_AUTHORS") {
                 setSelectedFilePaths([])
               }
-              if (newGroupingType !== "AUTHOR_FILES") {
-                setSelectedAuthorNames([])
-              }
               
               // Auto-switch to relevant size metric for FILE_AUTHORS
               if (newGroupingType === "FILE_AUTHORS") {
@@ -199,13 +192,6 @@ export const Options = memo(function Options() {
       {groupingType === "FILE_AUTHORS" && (
         <div className="card mt-4">
           <FileSelector />
-        </div>
-      )}
-
-      {/* Add the conditional AuthorSelector here */}
-      {groupingType === "AUTHOR_FILES" && (
-        <div className="card mt-4">
-          <AuthorSelector />
         </div>
       )}
     </>

@@ -179,11 +179,6 @@ export function Providers({ children, data }: ProvidersProps) {
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           selectedFilePaths: filePaths
-        })),
-      setSelectedAuthorNames: (authorNames: string[]) =>
-        setOptions((prevOptions) => ({
-          ...(prevOptions ?? getDefaultOptionsContextValue()),
-          selectedAuthorNames: authorNames
         }))
     }),
     [options, submit]
