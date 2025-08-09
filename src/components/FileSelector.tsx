@@ -156,14 +156,18 @@ export function FileSelector() {
   }, [patternInput, allFiles])
 
   const commonPatterns = [
-    { name: 'All Test Files', pattern: '**/test/**,**/*.test.*,**/*.spec.*', icon: '🧪' },
-    { name: 'All TypeScript Files', pattern: '**/*.{ts,tsx}', icon: '📘' },
-    { name: 'All JavaScript Files', pattern: '**/*.{js,jsx}', icon: '📙' },
-    { name: 'All CSS/Style Files', pattern: '**/*.{css,scss,sass,less}', icon: '🎨' },
-    { name: 'All Config Files', pattern: '**/*.{json,yaml,yml,toml,ini}', icon: '⚙️' },
-    { name: 'Component Files', pattern: '**/components/**', icon: '🧩' },
-    { name: 'Source Files', pattern: '**/src/**', icon: '📁' },
-    { name: 'Documentation', pattern: '**/*.{md,txt,rst}', icon: '📚' }
+    { name: 'Test Files', pattern: '**/*.{test.*,spec.*}', icon: '🧪' },
+    { name: 'TypeScript/JavaScript', pattern: '**/*.{ts,tsx,js,jsx}', icon: '📘' },
+    { name: 'Stylesheets', pattern: '**/*.{css,scss,sass,less,styl}', icon: '🎨' },
+    { name: 'Config Files', pattern: '**/*.{json,yaml,yml,toml,ini}', icon: '⚙️' },
+    { name: 'Source Code', pattern: '**/src/**', icon: '📁' },
+    { name: 'Components', pattern: '**/components/**,**/ui/**', icon: '🧩' },
+    { name: 'Documentation', pattern: '**/docs/**,**/*.{md,txt,rst}', icon: '📚' },
+    { name: 'Backend Languages', pattern: '**/*.{py,rb,go,rs,java,kt}', icon: '⚡' },
+    { name: 'Database Files', pattern: '**/migrations/**,**/schema/**', icon: '🗄️' },
+    { name: 'Static Assets', pattern: '**/assets/**,**/static/**,**/*.{png,jpg,svg,ico}', icon: '🖼️' },
+    { name: 'Build Output', pattern: '**/build/**,**/dist/**,**/target/**', icon: '📦' },
+    { name: 'Docker Files', pattern: '**/{Dockerfile,docker-compose.*,*.dockerfile}', icon: '🐳' }
   ]
 
   return (
@@ -338,31 +342,17 @@ export function FileSelector() {
             )}
             
             {/* Common Patterns for quick use */}
-            <div className="grid grid-cols-2 gap-1">
-              <button
-                onClick={() => setPatternInput('**/*.{test.*,spec.*}')}
-                className="text-left px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-              >
-                🧪 Test Files
-              </button>
-              <button
-                onClick={() => setPatternInput('**/*.{ts,tsx}')}
-                className="text-left px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-              >
-                📘 TypeScript
-              </button>
-              <button
-                onClick={() => setPatternInput('**/*.{json,yaml,yml}')}
-                className="text-left px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-              >
-                ⚙️ Config Files
-              </button>
-              <button
-                onClick={() => setPatternInput('**/src/**')}
-                className="text-left px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-              >
-                📁 Source Files
-              </button>
+            <div className="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto">
+              {commonPatterns.map((pattern, index) => (
+                <button
+                  key={index}
+                  onClick={() => setPatternInput(pattern.pattern)}
+                  className="text-left px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                  title={pattern.pattern}
+                >
+                  {pattern.icon} {pattern.name}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -406,8 +396,21 @@ export function FileSelector() {
       ) : (
         <div className="text-xs text-gray-500 dark:text-gray-400">
           <div><strong>Pattern mode:</strong> Create groups that aggregate author contributions across multiple files</div>
-          <div>• <code>**/*.{`{test.*,spec.*}`}</code> - All test files</div>
-          <div>• <code>**/src/**</code> - All source files</div>
+          <div className="mt-1 space-y-0.5">
+            <div><strong>Example patterns:</strong></div>
+            <div><code>**/*.&#123;test.*,spec.*&#125;</code> - All test files</div>
+            <div><code>**/*.&#123;ts,tsx,js,jsx&#125;</code> - All TypeScript and JavaScript files</div>
+            <div><code>**/*.&#123;css,scss,sass,less,styl&#125;</code> - All stylesheet files</div>
+            <div><code>**/*.&#123;json,yaml,yml,toml,ini&#125;</code> - All config files</div>
+            <div><code>**/src/**</code> - All source files</div>
+            <div><code>**/components/**,**/ui/**</code> - All component files</div>
+            <div><code>**/docs/**,**/*.&#123;md,txt,rst&#125;</code> - All documentation</div>
+            <div><code>**/*.&#123;py,rb,go,rs,java,kt&#125;</code> - Backend language files</div>
+            <div><code>**/migrations/**,**/schema/**</code> - Database files</div>
+            <div><code>**/assets/**,**/static/**</code> - Static asset files</div>
+            <div><code>**/build/**,**/dist/**,**/target/**</code> - Build output files</div>
+            <div><code>**/&#123;Dockerfile,docker-compose.*,*.dockerfile&#125;</code> - Docker files</div>
+          </div>
         </div>
       )}
 
