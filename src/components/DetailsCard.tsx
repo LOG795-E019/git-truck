@@ -149,10 +149,16 @@ export function DetailsCard({
   const extension = last(clickedObject.name.split("."))
   // TODO: handle binary file properly or remove the entry
   if (chartType === "AUTHOR_GRAPH" || clickedObject.path.includes("/@")) {
-
+    
   const authorName = clickedObject.name;
   const stats = databaseInfo.authorsTotalStats[authorName];
   const color = authorColors.get(authorName) ?? "#ccc";
+  // Add safety check for stats
+  if (!stats) {
+    // Clear clickedObject when switching to author graph with incompatible object
+    setClickedObject(null);
+    return null;
+  }
   let metricString = "Nb Lines Changed";
   if (sizeMetric === "MOST_COMMITS") {
     metricString = "Nb Commits";
