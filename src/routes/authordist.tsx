@@ -1,6 +1,8 @@
 import type { LoaderFunctionArgs } from "@remix-run/node"
+import { json } from "@remix-run/node";
 import invariant from "tiny-invariant"
 import InstanceManager from "~/analyzer/InstanceManager.server"
+import { AuthorContributionData } from "~/components/DetailsCard";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url)
@@ -24,28 +26,45 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   console.log("metric_lol:", chosen_metric )
 
   const instance = InstanceManager.getInstance(repo, branch)
-  if (!instance) return []
+  if (!instance) return json([]);
+
+  let authorContributions: { author: string; contribs: number }[];
+
   if (grouping === "FILE_TYPE" && isblob === "false"){
     const path_adjusted = path.split("/").slice(0, -1).join("/").replace(/^\/+/, "")
-    const extension = path.split('.').pop() || "" // Get the file extension
+    const extension = path.split('.').pop() || "" 
     console.log("path_adjusted", path_adjusted)
     console.log("extension", extension)
     console.log("metric", metric)    
-    return await instance.db.getAuthorContribsForExtension(path_adjusted, extension, chosen_metric)
+    authorContributions = await instance.db.getAuthorContribsForExtension(path_adjusted, extension, chosen_metric)
   }
   else if(grouping === "JSON_RULES" && isblob === "false"){
     const path_adjusted = path.split("/").slice(0, -1).join("/").replace(/^\/+/, "")
-    const keyword = path.split('#').pop() || "" // Get the file extension
+    const keyword = path.split('#').pop() || "" 
     console.log("path_adjusted", path_adjusted)
     console.log("extension", keyword)
-    return await instance.db.getAuthorContribsForKeyword(path_adjusted, keyword, chosen_metric)
+    authorContributions = await instance.db.getAuthorContribsForKeyword(path_adjusted, keyword, chosen_metric)
   }
-  else{
+  else {
     console.log("path:", path)
     console.log("grouping:", grouping)
-    const response = await instance.db.getAuthorContribsForPath(path, isblob === "true", chosen_metric)
-    console.log("response:", response)
-    return response
+    authorContributions = await instance.db.getAuthorContribsForPath(path, isblob === "true", chosen_metric)
+    console.log("response:", authorContributions)
   }
-  
+
+  const enrichedAuthorContributions: AuthorContributionData[] = [];
+  for (const authorCont of authorContributions) {
+      const authorPathStats = await instance.db.getAuthorCommitsAndLinesForPath(
+          authorCont.author,
+          path,
+          isblob === "true"
+      );
+
+      enrichedAuthorContributions.push({
+          ...authorCont,
+          commitsOnPath: authorPathStats?.commits ?? 0,
+      });
+  }
+
+  return json(enrichedAuthorContributions);
 }
