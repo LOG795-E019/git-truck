@@ -1,47 +1,65 @@
 import React, { useState, useMemo } from 'react'
 import { useData } from "../contexts/DataContext"
 import { useOptions } from '~/contexts/OptionsContext'
+import type { FileGroup } from '~/contexts/OptionsContext'
 import { Icon } from '@mdi/react'
 import { mdiMagnify, mdiClose, mdiChevronDown, mdiRegex, mdiFileMultiple } from '@mdi/js'
 
 export function FileSelector() {
   const { databaseInfo } = useData()
-  const { selectedFilePaths, setSelectedFilePaths } = useOptions()
+  const { 
+    fileGroups = [], 
+    setFileGroups, 
+    selectedFilePaths = [], 
+    setSelectedFilePaths,
+    fileAuthorMode,
+    setFileAuthorMode 
+  } = useOptions()
+  
   const [searchTerm, setSearchTerm] = useState('')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-  const [searchMode, setSearchMode] = useState<'individual' | 'pattern'>('individual')
   const [patternInput, setPatternInput] = useState('')
+  const [groupName, setGroupName] = useState('')
 
   // Get all files from the database
   const allFiles = useMemo(() => {
-    if (!databaseInfo) return []
+    if (!databaseInfo?.authorsFilesStats) return []
     
     const files = new Set<string>()
-    
-    // Extract files from authorsFilesStats
     Object.values(databaseInfo.authorsFilesStats).forEach(authorStats => {
-      Object.keys(authorStats).forEach(filePath => {
-        files.add(filePath)
-      })
+      if (authorStats && typeof authorStats === 'object') {
+        Object.keys(authorStats).forEach(filePath => {
+          if (filePath && typeof filePath === 'string') {
+            files.add(filePath)
+          }
+        })
+      }
     })
     
-    const fileArray = Array.from(files).sort()
-    console.log('Sample files from database:', fileArray.slice(0, 10))
-    console.log('File format example:', fileArray[0])
-    
-    return fileArray
+    return Array.from(files).sort()
   }, [databaseInfo])
 
-  // Pattern matching for files (FIXED - expand braces BEFORE comma splitting)
+  // Handle mode switching with cleanup
+  const handleModeSwitch = (newMode: 'groups' | 'individual') => {
+    if (newMode !== fileAuthorMode) {
+      // Clear the data from the previous mode
+      if (fileAuthorMode === 'groups') {
+        setFileGroups([]) // Clear groups when switching to individual
+      } else {
+        setSelectedFilePaths([]) // Clear individual selections when switching to groups
+      }
+      
+      setFileAuthorMode(newMode)
+      setIsDropdownOpen(false)
+    }
+  }
+
+  // Pattern matching function with proper error handling
   const getFilesFromPattern = (pattern: string): string[] => {
-    if (!pattern.trim()) return []
-    
-    console.log('Pattern:', pattern)
-    console.log('Available files sample:', allFiles.slice(0, 10))
-    console.log('Total files:', allFiles.length)
+    if (!pattern?.trim()) return []
     
     try {
-      // FIRST: Expand brace patterns in the entire string
+      // Expand brace patterns first
       const expandBraces = (pat: string): string[] => {
         const braceMatch = pat.match(/\{([^}]+)\}/)
         if (!braceMatch) return [pat]
@@ -50,7 +68,6 @@ export function FileSelector() {
         const beforeBrace = pat.substring(0, braceMatch.index!)
         const afterBrace = pat.substring(braceMatch.index! + braceMatch[0].length)
         
-        // Recursively expand in case there are multiple brace patterns
         const results: string[] = []
         options.forEach(option => {
           const expanded = beforeBrace + option + afterBrace
@@ -59,58 +76,84 @@ export function FileSelector() {
         return results
       }
       
-      // Expand braces FIRST, then split by commas
       const expandedFromBraces = expandBraces(pattern)
       
-      // NOW split each expanded pattern by commas
+      // Split by commas and process each pattern
       const allPatterns: string[] = []
       expandedFromBraces.forEach(pat => {
         allPatterns.push(...pat.split(',').map(p => p.trim()).filter(Boolean))
       })
       
-      console.log('Expanded patterns:', allPatterns)
-      
       const matchedFiles = new Set<string>()
       
       allPatterns.forEach(pat => {
-        console.log('Processing pattern:', pat)
-        
-        // Convert glob pattern to regex (FIXED ORDER)
+        // Convert glob pattern to regex
         let regexPattern = pat
-          // 1. Replace ** FIRST with a placeholder to avoid conflicts
           .replace(/\*\*/g, '__DOUBLE_STAR__')
-          // 2. Escape dots (but our placeholder is safe)
           .replace(/\./g, '\\.')
-          // 3. Replace single * with [^/]*
           .replace(/\*/g, '[^/]*')
-          // 4. Replace our placeholder with .* (matches everything)
           .replace(/__DOUBLE_STAR__/g, '.*')
         
-        console.log('Regex pattern:', regexPattern)
+        const regex = new RegExp(`^${regexPattern}$`, 'i')
         
-        const regex = new RegExp(`^${regexPattern}$`, 'i') // Case insensitive
-        
-        let matches = 0
         allFiles.forEach(file => {
           if (regex.test(file)) {
             matchedFiles.add(file)
-            matches++
           }
         })
-        
-        console.log('Matches for pattern:', pat, '=', matches)
       })
       
-      const result = Array.from(matchedFiles).sort()
-      console.log('Final matches:', result.slice(0, 5))
-      return result
+      return Array.from(matchedFiles).sort()
     } catch (error) {
       console.warn('Invalid pattern:', pattern, error)
       return []
     }
   }
 
-  // Update the commonPatterns array:
+  // Create group handler with proper validation
+  const handleCreateGroup = () => {
+    const matchedFiles = getFilesFromPattern(patternInput)
+    if (matchedFiles.length > 0 && groupName.trim()) {
+      const newGroup: FileGroup = {
+        id: Date.now().toString(),
+        name: groupName.trim(),
+        pattern: patternInput,
+        filePaths: matchedFiles
+      }
+      
+      setFileGroups([...fileGroups, newGroup])
+      
+      // Clear inputs
+      setPatternInput('')
+      setGroupName('')
+      setIsDropdownOpen(false)
+    }
+  }
+
+  // Handle individual file selection
+  const handleFileSelect = (filePath: string) => {
+    const isSelected = selectedFilePaths.includes(filePath)
+    if (isSelected) {
+      setSelectedFilePaths(selectedFilePaths.filter(path => path !== filePath))
+    } else {
+      setSelectedFilePaths([...selectedFilePaths, filePath])
+    }
+  }
+
+  // Individual file search with safe filtering
+  const filteredFiles = useMemo(() => {
+    if (!searchTerm.trim()) return allFiles.slice(0, 100)
+    
+    return allFiles
+      .filter(file => file.toLowerCase().includes(searchTerm.toLowerCase()))
+      .slice(0, 100)
+  }, [allFiles, searchTerm])
+
+  // Preview files with error handling
+  const previewFiles = useMemo(() => {
+    if (!patternInput.trim()) return []
+    return getFilesFromPattern(patternInput)
+  }, [patternInput, allFiles])
 
   const commonPatterns = [
     { name: 'All Test Files', pattern: '**/test/**,**/*.test.*,**/*.spec.*', icon: '🧪' },
@@ -123,103 +166,51 @@ export function FileSelector() {
     { name: 'Documentation', pattern: '**/*.{md,txt,rst}', icon: '📚' }
   ]
 
-  // Filter files based on search term (for individual mode)
-  const filteredFiles = useMemo(() => {
-    if (searchMode === 'pattern') return []
-    return allFiles.filter(file => 
-      file.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  }, [allFiles, searchTerm, searchMode])
-
-  const handleFileToggle = (filePath: string) => {
-    if (selectedFilePaths.includes(filePath)) {
-      setSelectedFilePaths(selectedFilePaths.filter(path => path !== filePath))
-    } else {
-      setSelectedFilePaths([...selectedFilePaths, filePath])
-    }
-  }
-
-  const handleRemoveFile = (filePath: string) => {
-    setSelectedFilePaths(selectedFilePaths.filter(path => path !== filePath))
-  }
-
-  const clearAllFiles = () => {
-    setSelectedFilePaths([])
-  }
-
-  const handlePatternApply = () => {
-    const matchedFiles = getFilesFromPattern(patternInput)
-    if (matchedFiles.length > 0) {
-      setSelectedFilePaths([...new Set([...selectedFilePaths, ...matchedFiles])])
-      setPatternInput('')
-      setIsDropdownOpen(false)
-    }
-  }
-
-  const handleCommonPatternClick = (pattern: string) => {
-    const matchedFiles = getFilesFromPattern(pattern)
-    if (matchedFiles.length > 0) {
-      setSelectedFilePaths([...new Set([...selectedFilePaths, ...matchedFiles])])
-      setIsDropdownOpen(false)
-    }
-  }
-
-  const previewFiles = patternInput ? getFilesFromPattern(patternInput) : []
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Files</h3>
-        {selectedFilePaths.length > 0 && (
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">File Author Analysis</h3>
+        {/* Show appropriate clear button based on mode */}
+        {fileAuthorMode === 'groups' && fileGroups.length > 0 && (
           <button
-            onClick={clearAllFiles}
+            onClick={() => setFileGroups([])}
             className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
-            Clear all ({selectedFilePaths.length})
+            Clear all groups ({fileGroups.length})
+          </button>
+        )}
+        {fileAuthorMode === 'individual' && selectedFilePaths.length > 0 && (
+          <button
+            onClick={() => setSelectedFilePaths([])}
+            className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            Clear selection ({selectedFilePaths.length})
           </button>
         )}
       </div>
 
-      {/* Mode Toggle */}
-      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded p-1">
-        <button
-          onClick={() => setSearchMode('individual')}
-          className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${
-            searchMode === 'individual' 
-              ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400' 
-              : 'text-gray-600 dark:text-gray-400'
-          }`}
-        >
-          <Icon path={mdiFileMultiple} size={0.5} className="inline mr-1" />
-          Individual Files
-        </button>
-        <button
-          onClick={() => setSearchMode('pattern')}
-          className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${
-            searchMode === 'pattern' 
-              ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400' 
-              : 'text-gray-600 dark:text-gray-400'
-          }`}
-        >
-          <Icon path={mdiRegex} size={0.5} className="inline mr-1" />
-          Pattern Matching
-        </button>
-      </div>
-
-      {/* Selected files display */}
-      {selectedFilePaths.length > 0 && (
-        <div className="space-y-1 max-h-32 overflow-y-auto">
-          {selectedFilePaths.map(filePath => (
+      {/* Show active items for current mode */}
+      {fileAuthorMode === 'groups' && fileGroups.length > 0 && (
+        <div className="space-y-2 max-h-40 overflow-y-auto">
+          <div className="text-xs font-medium text-gray-700 dark:text-gray-300">
+            Active Groups ({fileGroups.length})
+          </div>
+          {fileGroups.map(group => (
             <div
-              key={filePath}
-              className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded text-xs"
+              key={group.id}
+              className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 px-2 py-2 rounded text-xs"
             >
-              <span className="truncate flex-1" title={filePath}>
-                {filePath.split('/').pop()}
-              </span>
+              <div className="flex-1">
+                <div className="font-medium text-green-700 dark:text-green-300">
+                  {group.name}
+                </div>
+                <div className="text-green-600 dark:text-green-400 text-xs">
+                  {group.filePaths.length} files • {group.pattern}
+                </div>
+              </div>
               <button
-                onClick={() => handleRemoveFile(filePath)}
-                className="ml-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+                onClick={() => setFileGroups(fileGroups.filter(g => g.id !== group.id))}
+                className="ml-2 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
               >
                 <Icon path={mdiClose} size={0.5} />
               </button>
@@ -228,15 +219,67 @@ export function FileSelector() {
         </div>
       )}
 
-      {/* Search Interface */}
+      {fileAuthorMode === 'individual' && selectedFilePaths.length > 0 && (
+        <div className="space-y-2 max-h-40 overflow-y-auto">
+          <div className="text-xs font-medium text-gray-700 dark:text-gray-300">
+            Selected Files ({selectedFilePaths.length})
+          </div>
+          <div className="space-y-1">
+            {selectedFilePaths.map(filePath => (
+              <div
+                key={filePath}
+                className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded text-xs"
+              >
+                <span className="flex-1 truncate text-blue-700 dark:text-blue-300">
+                  {filePath}
+                </span>
+                <button
+                  onClick={() => handleFileSelect(filePath)}
+                  className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+                >
+                  <Icon path={mdiClose} size={0.4} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Mode Toggle */}
+      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded p-1">
+        <button
+          onClick={() => handleModeSwitch('individual')}
+          className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${
+            fileAuthorMode === 'individual' 
+              ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400' 
+              : 'text-gray-600 dark:text-gray-400'
+          }`}
+        >
+          <Icon path={mdiFileMultiple} size={0.5} className="inline mr-1" />
+          Individual Files
+        </button>
+        <button
+          onClick={() => handleModeSwitch('groups')}
+          className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${
+            fileAuthorMode === 'groups' 
+              ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400' 
+              : 'text-gray-600 dark:text-gray-400'
+          }`}
+        >
+          <Icon path={mdiRegex} size={0.5} className="inline mr-1" />
+          Pattern Groups
+        </button>
+      </div>
+
+      {/* Content based on mode */}
       <div className="relative">
-        {searchMode === 'individual' ? (
+        {fileAuthorMode === 'individual' ? (
           /* Individual File Search */
           <div className="relative">
             <Icon path={mdiMagnify} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={0.75} />
             <input
               type="text"
-              placeholder="Search files..."
+              placeholder="Search files to add to analysis..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onFocus={() => setIsDropdownOpen(true)}
@@ -250,22 +293,36 @@ export function FileSelector() {
             </button>
           </div>
         ) : (
-          /* Pattern Input */
-          <div className="space-y-2">
+          /* Pattern Input for Groups - same as before */
+          <div className="space-y-2 border rounded p-3 bg-gray-50 dark:bg-gray-800">
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Create New Group
+            </div>
+            
+            {/* Group Name Input */}
+            <input
+              type="text"
+              placeholder="Group name (e.g., 'Frontend Files', 'Test & Config')"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              className="w-full px-3 py-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+            
+            {/* Pattern Input */}
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Enter pattern (e.g., **/*.test.*, **/components/**)"
+                placeholder="Pattern (e.g., **/*.{test.*,ts,tsx,json})"
                 value={patternInput}
                 onChange={(e) => setPatternInput(e.target.value)}
-                className="flex-1 px-3 py-2 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                className="flex-1 px-3 py-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               />
               <button
-                onClick={handlePatternApply}
-                disabled={!patternInput.trim() || previewFiles.length === 0}
-                className="px-3 py-2 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                onClick={handleCreateGroup}
+                disabled={!patternInput.trim() || !groupName.trim() || previewFiles.length === 0}
+                className="px-4 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                Add ({previewFiles.length})
+                Create Group
               </button>
             </div>
             
@@ -273,97 +330,89 @@ export function FileSelector() {
             {patternInput && (
               <div className="text-xs text-gray-600 dark:text-gray-400">
                 {previewFiles.length > 0 ? (
-                  <span>Matches {previewFiles.length} files</span>
+                  <span className="text-green-600">✓ Matches {previewFiles.length} files</span>
                 ) : (
-                  <span>No files match this pattern</span>
+                  <span className="text-red-600">✗ No files match this pattern</span>
                 )}
               </div>
             )}
             
-            {/* Common Patterns */}
+            {/* Common Patterns for quick use */}
             <div className="grid grid-cols-2 gap-1">
-              {commonPatterns.map((item, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleCommonPatternClick(item.pattern)}
-                  className="text-left px-2 py-1 text-xs bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                  title={item.pattern}
-                >
-                  <span className="mr-1">{item.icon}</span>
-                  {item.name}
-                </button>
-              ))}
+              <button
+                onClick={() => setPatternInput('**/*.{test.*,spec.*}')}
+                className="text-left px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+              >
+                🧪 Test Files
+              </button>
+              <button
+                onClick={() => setPatternInput('**/*.{ts,tsx}')}
+                className="text-left px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+              >
+                📘 TypeScript
+              </button>
+              <button
+                onClick={() => setPatternInput('**/*.{json,yaml,yml}')}
+                className="text-left px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+              >
+                ⚙️ Config Files
+              </button>
+              <button
+                onClick={() => setPatternInput('**/src/**')}
+                className="text-left px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+              >
+                📁 Source Files
+              </button>
             </div>
-          </div>
-        )}
-
-        {/* Dropdown for Individual Mode */}
-        {searchMode === 'individual' && isDropdownOpen && (
-          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border dark:border-gray-600 rounded shadow-lg max-h-48 overflow-y-auto">
-            {filteredFiles.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-gray-500">No files found</div>
-            ) : (
-              filteredFiles.map(filePath => (
-                <div
-                  key={filePath}
-                  onClick={() => handleFileToggle(filePath)}
-                  className={`px-3 py-2 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                    selectedFilePaths.includes(filePath) 
-                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
-                      : ''
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={selectedFilePaths.includes(filePath)}
-                      onChange={() => {}} // Handled by parent onClick
-                      className="mr-2"
-                    />
-                    <span className="truncate" title={filePath}>
-                      {filePath}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
           </div>
         )}
       </div>
 
-      {/* Pattern Help */}
-      {searchMode === 'pattern' && (
-        <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-          <div><strong>Pattern examples (click to copy):</strong></div>
-          <div className="space-y-1">
-            {[
-              { pattern: '**/*.test.*', description: 'All test files' },
-              { pattern: '**/*.{ts,tsx}', description: 'All TypeScript files' },
-              { pattern: '**/components/**', description: 'All files in components folders' },
-              { pattern: 'src/**/*.js,lib/**/*.js', description: 'Multiple patterns (comma-separated)' },
-              { pattern: '**/*.{json,yaml,yml}', description: 'All config files' },
-              { pattern: '**/src/**', description: 'All files in src directories' }
-            ].map((example, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <code 
-                  className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+      {/* Dropdown for Individual Mode */}
+      {fileAuthorMode === 'individual' && isDropdownOpen && (
+        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border dark:border-gray-600 rounded shadow-lg max-h-48 overflow-y-auto">
+          {filteredFiles.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-gray-500">No files found</div>
+          ) : (
+            filteredFiles.map(filePath => {
+              const isSelected = selectedFilePaths.includes(filePath)
+              return (
+                <div
+                  key={filePath}
                   onClick={() => {
-                    navigator.clipboard.writeText(example.pattern)
-                    setPatternInput(example.pattern)
+                    handleFileSelect(filePath)
+                    setSearchTerm('')
                   }}
-                  title="Click to copy and use"
+                  className={`px-3 py-2 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between ${
+                    isSelected ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : ''
+                  }`}
                 >
-                  {example.pattern}
-                </code>
-                <span className="text-gray-400">- {example.description}</span>
-              </div>
-            ))}
-          </div>
+                  <span className="flex-1 truncate">{filePath}</span>
+                  {isSelected && (
+                    <Icon path={mdiClose} size={0.4} className="ml-2 text-blue-600 dark:text-blue-400" />
+                  )}
+                </div>
+              )
+            })
+          )}
         </div>
       )}
 
-      {/* Click outside to close dropdown */}
-      {isDropdownOpen && searchMode === 'individual' && (
+      {/* Help text based on mode */}
+      {fileAuthorMode === 'individual' ? (
+        <div className="text-xs text-gray-500 dark:text-gray-400">
+          <div><strong>Individual mode:</strong> Select specific files to see their individual author bubbles</div>
+        </div>
+      ) : (
+        <div className="text-xs text-gray-500 dark:text-gray-400">
+          <div><strong>Pattern mode:</strong> Create groups that aggregate author contributions across multiple files</div>
+          <div>• <code>**/*.{`{test.*,spec.*}`}</code> - All test files</div>
+          <div>• <code>**/src/**</code> - All source files</div>
+        </div>
+      )}
+
+      {/* Click outside handler */}
+      {isDropdownOpen && (
         <div 
           className="fixed inset-0 z-0" 
           onClick={() => setIsDropdownOpen(false)}
