@@ -9,6 +9,7 @@ import { useClickedObject } from "~/contexts/ClickedContext"
 import { allExceptLast, getSeparator } from "~/util"
 import { Icon } from "@mdi/react"
 import { mdiFolder, mdiFileOutline, mdiMagnify } from "@mdi/js"
+import { useOptions } from "~/contexts/OptionsContext"
 
 function findSearchResults(tree: GitTreeObject, searchString: string): SearchResults {
   const searchResults: Record<string, GitObject> = {}
@@ -32,6 +33,7 @@ export const SearchCard = memo(function SearchCard() {
   const searchResultsArray = useMemo(() => Object.values(searchResults), [searchResults])
   const id = useId()
   const { databaseInfo } = useData()
+  const { chartType } = useOptions()
 
   useEffect(() => {
     const searchOverride = (event: KeyboardEvent) => {
@@ -46,54 +48,56 @@ export const SearchCard = memo(function SearchCard() {
     }
   }, [])
 
-  return (
-    <>
-      <div className="card sticky top-0 flex flex-col gap-2">
-        <h2 className="card__title justify-start gap-2">
-          <Icon path={mdiMagnify} size="1.25em" />
-          Search
-        </h2>
-        <div className="flex gap-2">
-          <input
-            className="input"
-            ref={searchFieldRef}
-            id={id}
-            type="search"
-            placeholder="Search for a file or folder..."
-            value={searchText}
-            onChange={(event) => {
-              const value = event.target.value
-              setSearchText(value)
-              startTransition(() => {
-                if (value.trim() === "") setSearchResults({})
-                setSearchResults(findSearchResults(databaseInfo.fileTree, value))
-              })
-            }}
-          />
-          <button
-            className="btn btn--primary"
-            onClick={() => {
-              if (searchFieldRef.current) {
-                setSearchText("")
+  if (chartType !== "AUTHOR_GRAPH")
+    return (
+      <>
+        <div className="card sticky top-0 flex flex-col gap-2">
+          <h2 className="card__title justify-start gap-2">
+            <Icon path={mdiMagnify} size="1.25em" />
+            Search
+          </h2>
+          <div className="flex gap-2">
+            <input
+              className="input"
+              ref={searchFieldRef}
+              id={id}
+              type="search"
+              placeholder="Search for a file or folder..."
+              value={searchText}
+              onChange={(event) => {
+                const value = event.target.value
+                setSearchText(value)
                 startTransition(() => {
-                  setSearchResults({})
+                  if (value.trim() === "") setSearchResults({})
+                  setSearchResults(findSearchResults(databaseInfo.fileTree, value))
                 })
-              }
-            }}
-            disabled={searchText.trim() === ""}
-          >
-            Clear
-          </button>
+              }}
+            />
+            <button
+              className="btn btn--primary"
+              onClick={() => {
+                if (searchFieldRef.current) {
+                  setSearchText("")
+                  startTransition(() => {
+                    setSearchResults({})
+                  })
+                }
+              }}
+              disabled={searchText.trim() === ""}
+            >
+              Clear
+            </button>
+          </div>
+          {isTransitioning || searchText.length > 0 ? (
+            <p className="card-p">
+              {isTransitioning ? "Searching..." : searchText.length > 0 ? `${searchResultsArray.length} results` : null}
+            </p>
+          ) : null}
         </div>
-        {isTransitioning || searchText.length > 0 ? (
-          <p className="card-p">
-            {isTransitioning ? "Searching..." : searchText.length > 0 ? `${searchResultsArray.length} results` : null}
-          </p>
-        ) : null}
-      </div>
-      {searchResultsArray.length > 0 ? <SearchResultsList /> : null}
-    </>
-  )
+        {searchResultsArray.length > 0 ? <SearchResultsList /> : null}
+      </>
+    )
+  return null
 })
 
 const SearchResultsList = memo(function SearchResults() {
