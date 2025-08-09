@@ -2,7 +2,7 @@
 import { Fragment, memo, useMemo, useRef } from "react"
 import type { GitBlobObject, GitObject } from "~/analyzer/model"
 import { useMetrics } from "../contexts/MetricContext"
-import { useOptions } from "../contexts/OptionsContext"
+import { ChartType, useOptions } from "../contexts/OptionsContext"
 import type { MetricType } from "../metrics/metrics"
 import { allExceptFirst, dateFormatRelative, isBlob } from "../util"
 import { LegendDot } from "./util"
@@ -20,7 +20,7 @@ interface TooltipProps {
 
 export const Tooltip = memo(function Tooltip({ hoveredObject, x, y }: TooltipProps) {
   const tooltipRef = useRef<HTMLDivElement>(null)
-  const { metricType } = useOptions()
+  const { metricType, chartType } = useOptions()
   const [metricsData] = useMetrics()
   const { databaseInfo } = useData()
   const color = useMemo(() => {
@@ -68,6 +68,7 @@ export const Tooltip = memo(function Tooltip({ hoveredObject, x, y }: TooltipPro
       {hoveredObject?.type === "blob"
         ? ColorMetricDependentInfo({
             metric: metricType,
+            chartType,
             hoveredBlob: hoveredObject,
             databaseInfo
           })
@@ -78,9 +79,13 @@ export const Tooltip = memo(function Tooltip({ hoveredObject, x, y }: TooltipPro
 
 function ColorMetricDependentInfo(props: {
   metric: MetricType
+  chartType: ChartType
   hoveredBlob: GitBlobObject | null
   databaseInfo: DatabaseInfo
 }) {
+  // When in Author Graph Mode
+  if (props.chartType === "AUTHOR_GRAPH") return ""
+
   const slicedPath = props.hoveredBlob?.path ?? ""
   switch (props.metric) {
     case "MOST_COMMITS":
