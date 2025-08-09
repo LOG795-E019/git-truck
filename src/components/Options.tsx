@@ -274,45 +274,55 @@ export const Options = memo(function Options() {
             Size
           </legend>
           <EnumSelect
-            enum={SizeMetric}
+            enum={
+              chartType === "AUTHOR_GRAPH"
+                ? (Object.fromEntries(
+                    Object.entries(SizeMetric).filter(([key]) => key !== "FILE_SIZE" && key !== "LAST_CHANGED")
+                  ) as Record<SizeMetricType, string>)
+                : SizeMetric
+            }
             defaultValue={sizeMetric}
             onChange={(sizeMetric: SizeMetricType) => setSizeMetricType(sizeMetric)}
             iconMap={sizeMetricIcons}
           />
         </fieldset>
-        <fieldset className="rounded-lg border p-2">
-          <legend className="card__title ml-1.5 justify-start gap-2">
-            <Icon path={mdiPalette} size="1.25em" />
-            Color
-          </legend>
-          <EnumSelect
-            enum={Metric}
-            defaultValue={metricType}
-            onChange={(metric: MetricType) => {
-              setMetricType(metric)
-              if (!linkMetricAndSizeMetric) {
-                return
-              }
-              const relatedSizeMetricType = relatedSizeMetric[metric]
-              if (relatedSizeMetricType) {
-                setSizeMetricType(relatedSizeMetricType)
-              }
-            }}
-            iconMap={visualizationIcons}
-          />
-        </fieldset>
-        <fieldset className="rounded-lg border p-2">
-          <legend className="card__title ml-1.5 justify-start gap-2">
-            <Icon path={mdiGroup} size="1.25em" />
-            Grouping
-          </legend>
-          <EnumSelect
-            enum={Grouping}
-            defaultValue={groupingType}
-            onChange={(groupingType: GroupingType) => setGroupingType(groupingType)}
-            iconMap={groupingTypeIcons}
-          />
-        </fieldset>
+        {chartType !== "AUTHOR_GRAPH" && (
+          <fieldset className="rounded-lg border p-2">
+            <legend className="card__title ml-1.5 justify-start gap-2">
+              <Icon path={mdiPalette} size="1.25em" />
+              Color
+            </legend>
+            <EnumSelect
+              enum={Metric}
+              defaultValue={metricType}
+              onChange={(metric: MetricType) => {
+                setMetricType(metric)
+                if (!linkMetricAndSizeMetric) {
+                  return
+                }
+                const relatedSizeMetricType = relatedSizeMetric[metric]
+                if (relatedSizeMetricType) {
+                  setSizeMetricType(relatedSizeMetricType)
+                }
+              }}
+              iconMap={visualizationIcons}
+            />
+          </fieldset>
+        )}
+        {chartType !== "AUTHOR_GRAPH" && (
+          <fieldset className="rounded-lg border p-2">
+            <legend className="card__title ml-1.5 justify-start gap-2">
+              <Icon path={mdiGroup} size="1.25em" />
+              Grouping
+            </legend>
+            <EnumSelect
+              enum={Grouping}
+              defaultValue={groupingType}
+              onChange={(groupingType: GroupingType) => setGroupingType(groupingType)}
+              iconMap={groupingTypeIcons}
+            />
+          </fieldset>
+        )}
 
         {/* Global Reset Button */}
         {chartType === "AUTHOR_GRAPH" && (
