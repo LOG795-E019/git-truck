@@ -9,7 +9,8 @@ import type {
   CommitSortingMethodsType,
   CommitSortingOrdersType,
   HierarchyType,
-  OptionsContextType
+  OptionsContextType,
+  FileGroup // Add this line
 } from "../contexts/OptionsContext"
 import { getDefaultOptionsContextValue, OptionsContext } from "../contexts/OptionsContext"
 import { PathContext } from "../contexts/PathContext"
@@ -150,6 +151,16 @@ export function Providers({ children, data }: ProvidersProps) {
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           renderCutoff: renderCutoff
         })),
+      setMinBubbleSize: (bubbleSize: number) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          minBubbleSize: bubbleSize
+        })),
+      setMaxBubbleSize: (bubbleSize: number) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          maxBubbleSize: bubbleSize
+        })),
       setShowFilesWithoutChanges: (showFilesWithoutChanges: boolean) =>
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
@@ -174,6 +185,31 @@ export function Providers({ children, data }: ProvidersProps) {
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           linkMetricAndSizeMetric: link
+        })),
+      setSelectedAuthors: (selectedAuthors: string[]) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          selectedAuthors
+        })),
+      setSelectedFiles: (selectedFiles: string[]) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          selectedFiles
+        })),
+      setSelectedFilePaths: (filePaths: string[]) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          selectedFilePaths: filePaths
+        })),
+      setFileGroups: (fileGroups: FileGroup[]) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          fileGroups
+        })),
+      setFileAuthorMode: (mode: 'groups' | 'individual') =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          fileAuthorMode: mode
         }))
     }),
     [options, submit]

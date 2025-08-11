@@ -69,7 +69,8 @@ export interface DatabaseInfo {
   timerange: [number, number]
   colorSeed: string | null
   authorColors: Record<string, `#${string}`>
-  commitCountPerDay: { date: string; count: number }[]
+  commitCountPerDay: { date: string; count: number; timestamp: number }[]
+  lineChangeCountPerDay: { date: string; count: number; timestamp: number }[]
   selectedRange: [number, number]
   analyzedRepos: CompletedResult[]
   contribSumPerFile: Record<string, number>
@@ -247,9 +248,7 @@ async function analyze(params: Params) {
 
   const timerange = await instance.db.getOverallTimeRange()
   let selectedRange = instance.db.selectedRange
-  if (!selectedRange || 
-      selectedRange === timerange || 
-      (selectedRange[0] === 0 && selectedRange[1] === 1000000000000)) {
+  if (!selectedRange || selectedRange === timerange || (selectedRange[0] === 0 && selectedRange[1] === 1000000000000)) {
     console.log("Using timerange as selectedRange:", timerange)
     selectedRange = timerange
   }
@@ -282,8 +281,8 @@ async function analyze(params: Params) {
   if (!prevRes || shouldUpdate(reason, "cache")) await instance.db.updateCachedResult()
   console.timeEnd("updateCache")
   console.time("dbQueries")
-  const authorsTotalStats = await instance.db.getAuthorsTotalStats();
-  const authorsFilesStats = await instance.db.getAuthorsFileStats();
+  const authorsTotalStats = await instance.db.getAuthorsTotalStats()
+  const authorsFilesStats = await instance.db.getAuthorsFileStats()
   const dominantAuthors =
     prevRes && !shouldUpdate(reason, "dominantAuthor")
       ? prevRes.dominantAuthors

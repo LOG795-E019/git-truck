@@ -635,6 +635,23 @@ export default class DB {
     }));
   }
 
+  public async getAuthorCommitsAndLinesForPath(author: string, path: string, isBlob: boolean): Promise<{ commits: number } | null> {
+    const queryCondition = isBlob ? `filepath = '${path}'` : `filepath GLOB '${path}*'`;
+    const res = await this.query(`
+      SELECT
+        COUNT(DISTINCT commithash) AS nb_commits,
+      FROM filechanges_commits_renamed_cached
+      WHERE author = '${author}' AND ${queryCondition};
+    `);
+
+    if (res.length > 0) {
+      return {
+        commits: Number(res[0]["nb_commits"])
+      };
+    }
+    return null;
+  }
+
   public async getAuthorsFileStats(): Promise<Record<string, Record<string, { nb_commits: number; nb_line_change: number }>>> {
     const res = await this.query(`
       SELECT author, filepath,
