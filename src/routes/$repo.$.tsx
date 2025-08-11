@@ -246,7 +246,13 @@ async function analyze(params: Params) {
   await instance.loadRepoData()
 
   const timerange = await instance.db.getOverallTimeRange()
-  const selectedRange = instance.db.selectedRange
+  let selectedRange = instance.db.selectedRange
+  if (!selectedRange || 
+      selectedRange === timerange || 
+      (selectedRange[0] === 0 && selectedRange[1] === 1000000000000)) {
+    console.log("Using timerange as selectedRange:", timerange)
+    selectedRange = timerange
+  }
 
   const repo = await GitCaller.getRepoMetadata(path)
 
@@ -314,7 +320,11 @@ async function analyze(params: Params) {
   const commitCountPerDay =
     prevRes && !shouldUpdate(reason, "commitCountPerDay")
       ? prevRes.commitCountPerDay
-      : await instance.db.getCommitCountPerTime(timerange)
+      : await instance.db.getCommitCountPerTime(selectedRange)
+  const lineChangeCountPerDay =
+    prevRes && !shouldUpdate(reason, "lineChangeCountPerDay")
+      ? prevRes.lineChangeCountPerDay
+      : await instance.db.getLineChangePerTime(selectedRange)
   const contribCounts =
     prevRes && !shouldUpdate(reason, "contribSumPerFile")
       ? prevRes.contribSumPerFile
@@ -355,6 +365,7 @@ async function analyze(params: Params) {
     selectedRange,
     authorColors,
     commitCountPerDay,
+    lineChangeCountPerDay,
     analyzedRepos,
     contribSumPerFile: contribCounts,
     maxMinContribCounts,
