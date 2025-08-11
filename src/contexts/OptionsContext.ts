@@ -37,7 +37,7 @@ export type CommitSortingOrdersType = keyof typeof SortingOrders
 
 export type FileGroup = {
   id: string
-  name: string  
+  name: string
   pattern: string
   filePaths: string[]
 }
@@ -66,7 +66,7 @@ export type Options = {
   selectedFiles: string[]
   fileGroups: FileGroup[]
   selectedFilePaths: string[] // Keep this for individual files
-  fileAuthorMode: 'groups' | 'individual' // Add this new property
+  fileAuthorMode: "groups" | "individual" // Add this new property
 }
 
 export type OptionsContextType = Options & {
@@ -92,7 +92,7 @@ export type OptionsContextType = Options & {
   setSelectedFiles: (files: string[]) => void
   setSelectedFilePaths: (filePaths: string[]) => void // Updated setter
   setFileGroups: (fileGroups: FileGroup[]) => void // Add this line
-  setFileAuthorMode: (mode: 'groups' | 'individual') => void // Add this line
+  setFileAuthorMode: (mode: "groups" | "individual") => void // Add this line
 }
 
 export const OptionsContext = createContext<OptionsContextType | undefined>(undefined)
@@ -126,10 +126,10 @@ const defaultOptions: Options = {
   dominantAuthorCutoff: 0,
   linkMetricAndSizeMetric: false,
   selectedAuthors: [],
-  selectedFiles: []
+  selectedFiles: [],
   fileGroups: [],
   selectedFilePaths: [],
-  fileAuthorMode: 'individual' // Default to individual mode
+  fileAuthorMode: "individual" // Default to individual mode
 }
 
 export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {}): OptionsContextType {

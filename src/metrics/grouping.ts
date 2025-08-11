@@ -4,5 +4,6 @@ export const Grouping = {
   JSON_RULES: "JSON Rules",
   FILE_AUTHORS: "File Authors",
   AUTHOR_FILES: "Author Files"
+}
 
 export type GroupingType = keyof typeof Grouping

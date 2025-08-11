@@ -175,7 +175,7 @@ export const Options = memo(function Options() {
       // Only return the relevant options for FILE_AUTHORS
       return {
         MOST_COMMITS: "Commits",
-        MOST_CONTRIBS: "Line Changes", 
+        MOST_CONTRIBS: "Line Changes",
         EQUAL_SIZE: "Equal"
       } as Record<SizeMetricType, string>
     }
@@ -190,7 +190,7 @@ export const Options = memo(function Options() {
       LAST_CHANGED: mdiUpdate,
       MOST_CONTRIBS: mdiPlusMinusVariant
     }
-    
+
     if (groupingType === "FILE_AUTHORS") {
       // Only return icons for the visible options
       return {
@@ -199,7 +199,7 @@ export const Options = memo(function Options() {
         EQUAL_SIZE: allIcons.EQUAL_SIZE
       } as Record<SizeMetricType, string>
     }
-    
+
     return allIcons
   }, [groupingType])
 
@@ -296,7 +296,7 @@ export const Options = memo(function Options() {
             iconMap={chartTypeIcons}
           />
         </fieldset>
-        
+
         <fieldset className="rounded-lg border p-2">
           <legend className="card__title ml-1.5 justify-start gap-2">
             <Icon path={mdiImageSizeSelectSmall} size="1.25em" />
@@ -349,17 +349,17 @@ export const Options = memo(function Options() {
               defaultValue={groupingType}
               onChange={(newGroupingType: GroupingType) => {
                 setGroupingType(newGroupingType)
-              
+
                 // Clear selections when switching between grouping types
                 if (newGroupingType !== "FILE_AUTHORS") {
-                    setSelectedFilePaths([])
+                  setSelectedFilePaths([])
                 }
-              
+
                 // Auto-switch to relevant size metric for FILE_AUTHORS
                 if (newGroupingType === "FILE_AUTHORS") {
-                    if (sizeMetric === "FILE_SIZE" || sizeMetric === "LAST_CHANGED") {
-                        setSizeMetricType("MOST_CONTRIBS") // Default to line changes
-                    }
+                  if (sizeMetric === "FILE_SIZE" || sizeMetric === "LAST_CHANGED") {
+                    setSizeMetricType("MOST_CONTRIBS") // Default to line changes
+                  }
                 }
               }}
               iconMap={groupingTypeIcons}
