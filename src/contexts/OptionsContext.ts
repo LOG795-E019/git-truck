@@ -35,6 +35,13 @@ export const SortingOrders = (isDate: boolean) => {
 }
 export type CommitSortingOrdersType = keyof typeof SortingOrders
 
+export type FileGroup = {
+  id: string
+  name: string  
+  pattern: string
+  filePaths: string[]
+}
+
 export type Options = {
   hasLoadedSavedOptions: boolean
   metricType: MetricType
@@ -57,6 +64,9 @@ export type Options = {
   linkMetricAndSizeMetric: boolean
   selectedAuthors: string[]
   selectedFiles: string[]
+  fileGroups: FileGroup[]
+  selectedFilePaths: string[] // Keep this for individual files
+  fileAuthorMode: 'groups' | 'individual' // Add this new property
 }
 
 export type OptionsContextType = Options & {
@@ -80,6 +90,9 @@ export type OptionsContextType = Options & {
   setLinkMetricAndSizeMetric: (link: boolean) => void
   setSelectedAuthors: (authors: string[]) => void
   setSelectedFiles: (files: string[]) => void
+  setSelectedFilePaths: (filePaths: string[]) => void // Updated setter
+  setFileGroups: (fileGroups: FileGroup[]) => void // Add this line
+  setFileAuthorMode: (mode: 'groups' | 'individual') => void // Add this line
 }
 
 export const OptionsContext = createContext<OptionsContextType | undefined>(undefined)
@@ -101,7 +114,6 @@ const defaultOptions: Options = {
   sizeMetric: Object.keys(SizeMetric)[0] as SizeMetricType,
   groupingType: Object.keys(Grouping)[0] as GroupingType,
   commitSortingMethodsType: Object.keys(SortingMethods)[0] as CommitSortingMethodsType,
-  // The parameter value is based on default sorting method - date (true) or author (false)
   commitSortingOrdersType: Object.keys(SortingOrders(true))[0] as CommitSortingOrdersType,
   commitSearch: "",
   transitionsEnabled: true,
@@ -115,6 +127,9 @@ const defaultOptions: Options = {
   linkMetricAndSizeMetric: false,
   selectedAuthors: [],
   selectedFiles: []
+  fileGroups: [],
+  selectedFilePaths: [],
+  fileAuthorMode: 'individual' // Default to individual mode
 }
 
 export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {}): OptionsContextType {
@@ -180,6 +195,15 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setSelectedFiles: () => {
       throw new Error("No setSelectedFilesSetter provided")
+    },
+    setSelectedFilePaths: () => {
+      throw new Error("No setSelectedFilePathsSetter provided")
+    },
+    setFileGroups: () => {
+      throw new Error("No setFileGroupsSetter provided")
+    },
+    setFileAuthorMode: () => {
+      throw new Error("No setFileAuthorModeSetter provided")
     }
   }
 }
