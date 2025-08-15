@@ -1,0 +1,34 @@
+@startuml
+title Cas d'utilisation : Regroupement Customisé (JSON Rules)
+
+participant "Options.tsx" as O
+participant "OptionsContext" as OC
+participant "Chart.tsx" as C
+participant "DetailsCard.tsx" as DC
+participant "DatabaseInfo" as DB
+participant "JSON Config" as JSON
+
+note over JSON: Pré-condition: Fichier JSON configuré avec règles de groupement
+note over DB: Pré-condition: Repository Git avec fichiers ayant concepts dans noms/chemins
+
+note right: EnumSelect onChange(groupingType: GroupingType)
+O -> OC: setGroupingType("JSON_RULES")
+OC -> OC: Met à jour groupingType = "JSON_RULES"
+
+== Mise à jour du graphique ==
+OC --> C: Notifie changement groupingType via useOptions()
+C -> C: Re-render avec nouveau groupingType
+C -> C: createPartitionedHiearchy(groupingType="JSON_RULES")
+
+alt groupingType === "JSON_RULES"
+    C -> DB: Récupère databaseInfo
+    C -> JSON: Charge configuration JSON
+    JSON --> C: Retourne règles de groupement (patterns, noms)
+    note right: Exemple règles:\n- "test": ["*test*", "*spec*"]\n- "config": ["*config*", "*.json"]\n- "components": ["*component*"]
+    
+    C -> C: createPartitionedHiearchy(databaseInfo): currentTree
+    C -> C: fileJSONRulesGrouping(currentTree, zoomFilter, showFilesWithNoJSONRules)
+    note right: Analyse des chemins/noms de fichiers\ncontre les patterns JSON:\n- Groupe "Tests"\n- Groupe "Configuration"\n- Groupe "Components"
+end
+
+C -> C: pack() - Calcule positions des éléments

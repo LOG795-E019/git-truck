@@ -1,0 +1,29 @@
+@startuml
+title Cas d'utilisation : Regroupement par type de fichier
+
+participant "Options.tsx" as O
+participant "OptionsContext" as OC
+participant "Chart.tsx" as C
+participant "DetailsCard.tsx" as DC
+participant "DatabaseInfo" as DB
+
+note over DB: Pré-condition: Repository Git avec fichiers .js, .ts, .py, .css, .html, etc.
+
+note right: EnumSelect onChange(groupingType: GroupingType)
+O -> OC: setGroupingType("FILE_TYPE")
+OC -> OC: Met à jour groupingType = "FILE_TYPE"
+
+== 3. Mise à jour du graphique ==
+OC --> C: Notifie changement groupingType via useOptions()
+C -> C: Re-render avec nouveau groupingType
+C -> C: createPartitionedHiearchy(groupingType="FILE_TYPE")
+
+alt groupingType === "FILE_TYPE"
+    C -> DB: Récupère databaseInfo
+    C -> C: createPartitionedHiearchy(databaseInfo): currentTree
+    C -> C: fileTypesGrouping(currentTree)
+    note right: Analyse des chemins de fichiers\npour extraire les extensions\n(.js, .ts, .py, .css, etc.)
+end
+
+C -> C: pack() - Calcule positions des éléments
+@enduml

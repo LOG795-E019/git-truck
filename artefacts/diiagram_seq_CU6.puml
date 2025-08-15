@@ -1,0 +1,57 @@
+@startuml
+title Cas d'utilisation 6 : Affichage des détails d'un auteur
+
+participant "Chart.tsx" as C
+participant "DetailsCard.tsx" as DC
+participant "DatabaseInfo" as DB
+participant "useFetcher" as F
+participant "authordist.tsx" as AD
+participant "authorfiles.tsx" as AF
+
+note over C: Pré-condition: Un auteur est déjà sélectionné (clickedObject.path.includes("/@"))
+
+== Affichage des détails de l'auteur ==
+C --> DC: Notification via useClickedObject()
+DC -> DC: useEffect() - clickedObject changed
+DC -> DC: if (!clickedObject.path.includes("/@")) return
+
+alt clickedObject.path.includes("/@")
+    DC -> DC: Extraction authorName = clickedObject.name
+    
+    == Métriques générales de l'auteur ==
+    DC -> DB: databaseInfo.authorsTotalStats[authorName]
+    DB --> DC: stats (nb_commits, nb_line_change)
+    
+    DC -> DC: AuthorStatsEntry(stats.nb_commits)
+    DC -> DC: AuthorStatsEntry(stats.nb_line_change)
+    
+    == Top 5 fichiers modifiés ==
+    DC -> F: fetcher.load("/authorfiles?...")
+    note right: searchParams:\n- author: authorName\n- metric: sizeMetric\n- limit: 5
+    
+    F -> AF: loader({ request })
+    AF -> DB: instance.db.getTopFilesForAuthor(authorName, metric, 5)
+    DB --> AF: topFiles[]
+    AF --> F: return json(topFiles)
+    F --> DC: setAuthorFiles(data)
+    
+    DC -> DC: AuthorTopFilesFragment rendering
+    note right: Affiche les 5 fichiers\nles plus modifiés par l'auteur\navec leurs métriques
+    
+    == Top 5 relations avec autres auteurs ==
+    DC -> F: fetcher.load("/authordist?...")
+    note right: searchParams:\n- author: authorName\n- type: "relationships"\n- limit: 5
+    
+    F -> AD: loader({ request })
+    AD -> DB: instance.db.getTopAuthorRelationships(authorName, 5)
+    DB --> AD: relationships[]
+    note right: Relations basées sur:\n- Fichiers communs\n- Contributions partagées\n- Fréquence de collaboration
+    
+    AD --> F: return json(relationships)
+    F --> DC: setAuthorRelationships(data)
+    
+    DC -> DC: AuthorRelationshipsFragment rendering
+    note right: Affiche les 5 auteurs\navec qui il a le plus collaboré\net les métriques de collaboration
+end
+
+@enduml

@@ -1,0 +1,43 @@
+@startuml
+title Cas d'utilisation 9 : Filtrage temporel du graphe
+
+participant "TimeSelection.tsx" as TS
+participant "OptionsContext" as OC
+participant "$repo.$.tsx" as R
+participant "Chart.tsx" as C
+participant "DatabaseInfo" as DB
+
+note over C: Pré-condition: Un graphe est déjà sélectionné (Author Graph ou groupement)
+
+== Sélection de période temporelle ==
+TS -> OC: setSelectedRange([newStart, newEnd])
+OC -> OC: Met à jour selectedRange
+
+== Mise à jour des données filtrées ==
+OC --> R: Notification via useOptions()
+R -> R: Re-render avec nouveau selectedRange
+R -> DB: instance.db.filterDataByTimeRange(newSelectedRange)
+DB --> R: Données filtrées par période
+
+== Ajustement du graphe ==
+R --> C: Nouveau databaseInfo avec période filtrée
+C -> C: Re-render avec nouvelles données temporelles
+alt chartType === "AUTHOR_GRAPH"
+    C -> C: createAuthorNetworkHierarchy(filteredDatabaseInfo)
+    note right: Recalcule réseau d'auteurs:\n- Seulement les contributions\n  dans la période sélectionnée\n- Ajuste tailles des cercles\n- Recalcule les relations
+    
+    C -> C: getAuthorsRelationships(filteredDatabaseInfo)
+    note right: Relations basées uniquement\nsur les fichiers communs\nmodifiés dans la période
+    
+    C -> C: Redessine liens entre auteurs filtrés
+    
+else groupingType !== "NONE"
+    C -> C: createPartitionedHiearchy(filteredDatabaseInfo, groupingType)
+    note right: Regroupe selon le type:\n- FILE_TYPE: extensions dans période\n- AUTHOR_FILES: auteurs actifs\n- JSON_RULES: fichiers matchant
+    
+    C -> C: Recalcule métriques par groupe
+    note right: Métriques ajustées:\n- Commits dans la période\n- Lignes changées dans la période\n- Auteurs actifs dans la période
+end
+
+C -> C: pack() - Recalcule positions avec nouvelles données
+@enduml

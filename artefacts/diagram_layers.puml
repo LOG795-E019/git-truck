@@ -1,0 +1,62 @@
+@startuml
+!define COMPONENT rectangle
+
+title Architecture en couches - Git Truck Visualizer (Haut niveau)
+
+package "Couche Interface Utilisateur" as ui {
+  COMPONENT "Options.tsx" as options
+  COMPONENT "Chart.tsx" as chart
+  COMPONENT "DetailsCard.tsx" as details
+  COMPONENT "BarChart.tsx" as barchart
+  COMPONENT "FileSelector.tsx" as fileselector
+}
+
+package "Couche État Global" as state {
+  COMPONENT "OptionsContext" as context
+  COMPONENT "DataContext" as datacontext
+  COMPONENT "ClickedContext" as clickedcontext
+}
+
+package "Couche Logique Serveur" as server {
+  COMPONENT "$repo.$.tsx" as repo
+  COMPONENT "authordist.tsx" as authordist
+  COMPONENT "DB.server.ts" as dbserver
+}
+
+package "Couche Fragments UI" as fragments {
+  COMPONENT "FileDistributionFragment" as filedist
+  COMPONENT "RelationshipDistFragment" as reldist
+  COMPONENT "AuthorDistFragment" as authordist_frag
+}
+
+package "Couche Données" as data {
+  COMPONENT "DatabaseInfo" as db
+}
+
+' Relations principales
+options --> context
+chart --> context
+details --> context
+barchart --> context
+fileselector --> context
+
+chart --> clickedcontext
+details --> clickedcontext
+
+context --> repo
+repo --> dbserver
+
+repo --> db
+authordist --> dbserver
+
+details --> filedist
+details --> reldist
+details --> authordist_frag
+
+filedist --> datacontext
+reldist --> datacontext
+authordist_frag --> authordist
+
+datacontext --> db
+
+@enduml
