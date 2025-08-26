@@ -107,6 +107,7 @@ export interface GitBlobObject extends AbstractGitObject {
   name: string
   path: string
   sizeInBytes: number
+  size?: number; 
 }
 
 export interface GitTreeObject extends AbstractGitObject {
@@ -114,6 +115,7 @@ export interface GitTreeObject extends AbstractGitObject {
   name: string
   path: string
   children: (GitTreeObject | GitBlobObject)[]
+  size?: number; 
 }
 
 export interface GitCommitObject extends AbstractGitObject {

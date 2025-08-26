@@ -9,7 +9,8 @@ import type {
   CommitSortingMethodsType,
   CommitSortingOrdersType,
   HierarchyType,
-  OptionsContextType
+  OptionsContextType,
+  FileGroup // Add this line
 } from "../contexts/OptionsContext"
 import { getDefaultOptionsContextValue, OptionsContext } from "../contexts/OptionsContext"
 import { PathContext } from "../contexts/PathContext"
@@ -21,6 +22,8 @@ import type { SizeMetricType } from "~/metrics/sizeMetric"
 import type { DepthType } from "~/metrics/chartDepth"
 import type { CommitTab } from "~/contexts/CommitTabContext"
 import { CommitTabContext, getDefaultCommitTab } from "~/contexts/CommitTabContext"
+import { GroupingType } from "~/metrics/grouping"
+import { useSubmit } from "@remix-run/react"
 
 interface ProvidersProps {
   children: React.ReactNode
@@ -33,6 +36,8 @@ export function Providers({ children, data }: ProvidersProps) {
   const [searchResults, setSearchResults] = useState<Record<string, GitObject>>({})
   const [path, setPath] = useState(data.repo.name)
   const [clickedObject, setClickedObject] = useState<GitObject | null>(null)
+
+  const submit = useSubmit()
 
   const metricsData: MetricsData = useMemo(() => {
     console.time("metrics")
@@ -106,7 +111,21 @@ export function Providers({ children, data }: ProvidersProps) {
           commitSearch
         })),
       setSizeMetricType: (sizeMetric: SizeMetricType) =>
-        setOptions((prevOptions) => ({ ...(prevOptions ?? getDefaultOptionsContextValue()), sizeMetric })),
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          sizeMetric
+        })),
+      setGroupingType: (groupingType: GroupingType) => {
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          groupingType
+        }))
+
+        // Use Remix's submit function to refresh the page
+        const formData = new FormData()
+        formData.append("refresh", "true")
+        submit(formData, { method: "post", action: window.location.pathname })
+      },
       setHoveredBlob: (blob: GitBlobObject | null) =>
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
@@ -132,11 +151,31 @@ export function Providers({ children, data }: ProvidersProps) {
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           renderCutoff: renderCutoff
         })),
+      setMinBubbleSize: (bubbleSize: number) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          minBubbleSize: bubbleSize
+        })),
+      setMaxBubbleSize: (bubbleSize: number) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          maxBubbleSize: bubbleSize
+        })),
       setShowFilesWithoutChanges: (showFilesWithoutChanges: boolean) =>
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           showFilesWithoutChanges: showFilesWithoutChanges
         })),
+      setShowFilesWithNoJSONRules: (showFilesWithNoJSONRules: boolean) => {
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          showFilesWithNoJSONRules: showFilesWithNoJSONRules
+        }))
+
+        const formData = new FormData()
+        formData.append("refresh", "true")
+        submit(formData, { method: "post", action: window.location.pathname })
+      },
       setDominantAuthorCutoff: (dominantAuthorCutoff: number) =>
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
@@ -146,9 +185,34 @@ export function Providers({ children, data }: ProvidersProps) {
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           linkMetricAndSizeMetric: link
+        })),
+      setSelectedAuthors: (selectedAuthors: string[]) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          selectedAuthors
+        })),
+      setSelectedFiles: (selectedFiles: string[]) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          selectedFiles
+        })),
+      setSelectedFilePaths: (filePaths: string[]) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          selectedFilePaths: filePaths
+        })),
+      setFileGroups: (fileGroups: FileGroup[]) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          fileGroups
+        })),
+      setFileAuthorMode: (mode: 'groups' | 'individual') =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          fileAuthorMode: mode
         }))
     }),
-    [options]
+    [options, submit]
   )
 
   useEffect(() => {

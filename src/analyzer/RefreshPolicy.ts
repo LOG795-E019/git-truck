@@ -15,6 +15,7 @@ export type DataItem =
   | "colorSeed"
   | "authorColors"
   | "commitCountPerDay"
+  | "lineChangeCountPerDay"
   | "loadRepoData"
   | "contribSumPerFile"
   | "maxMinContribCounts"
@@ -57,6 +58,7 @@ const refreshPolicy: Record<InvocationReason, DataItem[]> = {
     "colorSeed",
     "authorColors",
     "commitCountPerDay",
+    "lineChangeCountPerDay",
     "loadRepoData"
   ],
   unignore: [
@@ -136,6 +138,7 @@ const refreshPolicy: Record<InvocationReason, DataItem[]> = {
     "colorSeed",
     "authorColors",
     "commitCountPerDay",
+    "lineChangeCountPerDay",
     "loadRepoData"
   ],
   none: []

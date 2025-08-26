@@ -1,0 +1,40 @@
+@startuml
+title Cas d'utilisation 8 : Représentation des contributions à travers le temps
+
+participant "$repo.$.tsx" as R
+participant "BarChart.tsx" as BC
+participant "TimeSelection.tsx" as TS
+participant "OptionsContext" as OC
+participant "DatabaseInfo" as DB
+
+note over BC: Pré-condition: Histogramme déjà affiché
+
+== Sélection de période temporelle ==
+TS -> OC: setSelectedRange([newStart, newEnd])
+OC -> OC: Met à jour selectedRange
+
+OC --> R: Notification via useOptions()
+R -> R: Re-render avec nouveau selectedRange
+R -> DB: instance.db.getCommitCountPerTime(newSelectedRange)
+DB --> R: nouveaux commitCountPerDay[]
+R -> DB: instance.db.getLineChangePerTime(newSelectedRange)
+DB --> R: nouveaux lineChangeCountPerDay[]
+
+== Mise à jour de l'histogramme filtré ==
+R --> BC: Nouveau databaseInfo avec période filtrée
+BC -> BC: filteredData = chartData.filter(d => d.timestamp in newSelectedRange)
+BC -> BC: completeData = fillMissingDays(filteredData, newSelectedRange)
+BC -> BC: Re-dessine histogramme avec nouvelles données
+
+== Changement de métrique ==
+OC -> OC: setSizeMetric("MOST_COMMITS" | "MOST_CONTRIBS")
+OC -> OC: Met à jour sizeMetric
+OC --> BC: Notification via useOptions()
+
+== Ajustement de l'histogramme ==
+BC -> BC: metricLabel = isCommitMetric ? "commits" : "line changes"
+BC -> BC: chartData = isCommitMetric ? commitCountPerDay : lineChangeCountPerDay
+BC -> BC: filteredData = chartData.filter(d => d.timestamp in selectedRange)
+BC -> BC: Re-dessine histogramme avec nouvelle métrique
+
+@enduml

@@ -1,36 +1,51 @@
 import { Fragment } from "react"
 import { useMetrics } from "~/contexts/MetricContext"
 import { LegendDot } from "./util"
+import { AuthorContributionData } from "~/components/DetailsCard"
 
 interface AuthorDistFragProps {
-  items: { author: string; contribs: number }[]
+  items: AuthorContributionData[]
   show: boolean
   contribSum: number
+  showPercent?: boolean
 }
 
 export function AuthorDistFragment(props: AuthorDistFragProps) {
   const [, authorColors] = useMetrics()
 
   if (!props.show) return null
-
+  
   return (
     <>
       {props.items.map((legendItem) => {
         const contrib = legendItem.contribs
         const author = legendItem.author
-        const roundedContrib = Math.round((contrib / props.contribSum) * 100)
-        const contribPercentage = roundedContrib === 0 ? "<1" : roundedContrib
+        const roundedContrib = props.contribSum > 0 ? Math.round((contrib / props.contribSum) * 100) : 0
+        const contribPercentage = roundedContrib === 0 && props.contribSum > 0 ? "<1" : roundedContrib
+        
         return (
-          <Fragment key={author + contrib}>
-            <div
-              className="flex items-center gap-2 overflow-hidden overflow-ellipsis whitespace-pre text-sm font-semibold"
-              title={author}
-            >
-              <LegendDot authorColorToChange={author} className="ml-1" dotColor={authorColors.get(author) ?? "grey"} />
-              <span className="overflow-hidden overflow-ellipsis whitespace-pre font-bold opacity-80">{author}</span>
+          <div key={author} className="flex flex-col gap-1 mb-2"> {}
+            <div className="flex justify-between items-center">
+              <div
+                className="flex items-center gap-2 overflow-hidden overflow-ellipsis whitespace-pre text-sm font-semibold"
+                title={author}
+              >
+                <LegendDot authorColorToChange={author} className="ml-1" dotColor={authorColors.get(author) ?? "grey"} />
+                <span className="overflow-hidden overflow-ellipsis whitespace-pre font-bold opacity-80">{author}</span>
+              </div>
+              <p className="break-all text-right text-sm">
+                {props.showPercent === true ? `${contribPercentage}%` : contrib}
+              </p>
             </div>
-            <p className="break-all text-right text-sm">{contribPercentage}%</p>
-          </Fragment>
+            {}
+            <div className="flex gap-2 text-xs text-gray-600 ml-5"> {}
+              {legendItem.commitsOnPath !== undefined && (
+                <div className="rounded-sm bg-gray-100 px-1 py-0.5 border border-gray-200">
+                  Commits: {legendItem.commitsOnPath}
+                </div>
+              )}
+            </div>
+          </div>
         )
       })}
     </>

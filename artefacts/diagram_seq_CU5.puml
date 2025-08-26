@@ -1,0 +1,46 @@
+@startuml
+title Cas d'utilisation 5 : Représentation des relations entre les auteurs
+
+participant "Options.tsx" as O
+participant "OptionsContext" as OC
+participant "Chart.tsx" as C
+participant "DatabaseInfo" as DB
+
+note over DB: Pré-condition: Repository Git avec plusieurs auteurs
+
+== 1. Sélection du Layout Author Graph ==
+note right: EnumSelect onChange(chartType: ChartType)
+O -> OC: setChartType("AUTHOR_GRAPH")
+OC -> OC: Met à jour chartType = "AUTHOR_GRAPH"
+
+== 2. Mise à jour du graphique ==
+OC --> C: Notifie changement chartType via useOptions()
+C -> C: Re-render avec nouveau chartType
+C -> C: createPartitionedHiearchy(chartType="AUTHOR_GRAPH")
+
+alt chartType === "AUTHOR_GRAPH"
+    C -> DB: Récupère databaseInfo
+    DB --> C: Retourne authorsTotalStats, authorsFilesStats
+    
+    C -> C: createAuthorNetworkHierarchy(databaseInfo)
+    note right: Crée réseau d'auteurs:\n- Cercles pour chaque auteur\n- Taille basée sur contributions\n- Positionnement circulaire
+    
+    C -> C: getAuthorsRelationships(databaseInfo)
+    note right: Calcule relations entre auteurs:\n- Fichiers communs\n- Contributions partagées\n- Force des liens
+    
+    C -> C: Dessine liens entre auteurs
+    note right: Pour chaque paire d'auteurs:\n- Ligne colorée par auteur\n- Épaisseur selon contributions\n- Offset pour bidirectionnalité
+end
+
+C -> C: pack() - Calcule positions des éléments
+
+== 3. Filtrage par fichiers sélectionnés ==
+note right: Utilisateur sélectionne des fichiers
+O -> OC: setSelectedFilePaths([file1, file2, ...])
+
+note right: Utilisateur sélectionne des auteurs
+O -> OC: setSelectedAuthors([author1, author2, ...])
+OC -> C: Notifie changement selectedFilePaths et selectedAuthors via useOptions()
+C -> C: createAuthorNetworkHierarchy(DatabaseInfo, selectedFilePaths, selectedAuthors)
+
+@enduml

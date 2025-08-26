@@ -46,6 +46,8 @@ export interface RepoData {
 
 export interface DatabaseInfo {
   dominantAuthors: Record<string, { author: string; contribcount: number }>
+  authorsFilesStats: Record<string, Record<string, { nb_commits: number; nb_line_change: number }>>
+  authorsTotalStats: Record<string, { nb_commits: number; nb_line_change: number }>
   commitCounts: Record<string, number>
   lastChanged: Record<string, number>
   authorCounts: Record<string, number>
@@ -67,7 +69,8 @@ export interface DatabaseInfo {
   timerange: [number, number]
   colorSeed: string | null
   authorColors: Record<string, `#${string}`>
-  commitCountPerDay: { date: string; count: number }[]
+  commitCountPerDay: { date: string; count: number; timestamp: number }[]
+  lineChangeCountPerDay: { date: string; count: number; timestamp: number }[]
   selectedRange: [number, number]
   analyzedRepos: CompletedResult[]
   contribSumPerFile: Record<string, number>
@@ -244,7 +247,11 @@ async function analyze(params: Params) {
   await instance.loadRepoData()
 
   const timerange = await instance.db.getOverallTimeRange()
-  const selectedRange = instance.db.selectedRange
+  let selectedRange = instance.db.selectedRange
+  if (!selectedRange || selectedRange === timerange || (selectedRange[0] === 0 && selectedRange[1] === 1000000000000)) {
+    console.log("Using timerange as selectedRange:", timerange)
+    selectedRange = timerange
+  }
 
   const repo = await GitCaller.getRepoMetadata(path)
 
@@ -274,6 +281,8 @@ async function analyze(params: Params) {
   if (!prevRes || shouldUpdate(reason, "cache")) await instance.db.updateCachedResult()
   console.timeEnd("updateCache")
   console.time("dbQueries")
+  const authorsTotalStats = await instance.db.getAuthorsTotalStats()
+  const authorsFilesStats = await instance.db.getAuthorsFileStats()
   const dominantAuthors =
     prevRes && !shouldUpdate(reason, "dominantAuthor")
       ? prevRes.dominantAuthors
@@ -310,7 +319,11 @@ async function analyze(params: Params) {
   const commitCountPerDay =
     prevRes && !shouldUpdate(reason, "commitCountPerDay")
       ? prevRes.commitCountPerDay
-      : await instance.db.getCommitCountPerTime(timerange)
+      : await instance.db.getCommitCountPerTime(selectedRange)
+  const lineChangeCountPerDay =
+    prevRes && !shouldUpdate(reason, "lineChangeCountPerDay")
+      ? prevRes.lineChangeCountPerDay
+      : await instance.db.getLineChangePerTime(selectedRange)
   const contribCounts =
     prevRes && !shouldUpdate(reason, "contribSumPerFile")
       ? prevRes.contribSumPerFile
@@ -329,6 +342,8 @@ async function analyze(params: Params) {
 
   const databaseInfo: DatabaseInfo = {
     dominantAuthors,
+    authorsFilesStats,
+    authorsTotalStats,
     commitCounts,
     lastChanged,
     authorCounts,
@@ -349,6 +364,7 @@ async function analyze(params: Params) {
     selectedRange,
     authorColors,
     commitCountPerDay,
+    lineChangeCountPerDay,
     analyzedRepos,
     contribSumPerFile: contribCounts,
     maxMinContribCounts,

@@ -1,0 +1,58 @@
+@startuml
+title Cas d'utilisation 7 : Représentation des auteurs pour un fichier ou groupement
+
+participant "Options.tsx" as O
+participant "OptionsContext" as OC
+participant "Chart.tsx" as C
+participant "DatabaseInfo" as DB
+
+note over DB: Pré-condition: Repository Git avec des contributions
+
+== 1. Sélection du Grouping File Authors ==
+note right: EnumSelect onChange(groupingType: GroupingType)
+O -> OC: setGroupingType("FILE_AUTHORS")
+OC -> OC: Met à jour groupingType = "FILE_AUTHORS"
+
+== 2. Sélection d'un fichier ou pattern ==
+alt Sélection fichier spécifique
+    note right: Utilisateur clique sur un fichier dans l'interface
+    O -> OC: setSelectedFilePaths([filePath])
+    OC -> OC: Met à jour selectedFiles = [filePath]
+    
+else Définition pattern manuel
+    note right: Utilisateur saisit pattern manuellement
+    O -> OC: setSelectedFilePaths([pattern])
+    OC -> OC: Met à jour selectedFiles = [pattern]
+    
+else Sélection pattern depuis liste
+    note right: Utilisateur choisit pattern prédéfini
+    O -> OC: setSelectedFilePaths([predefinedPattern])
+    OC -> OC: Met à jour selectedFiles = [predefinedPattern]
+end
+
+== 3. Mise à jour du graphique ==
+OC --> C: Notifie changements via useOptions()
+C -> C: Re-render avec nouveau groupingType et selectedFiles
+C -> C: createPartitionedHiearchy(groupingType="FILE_AUTHORS")
+
+alt groupingType === "FILE_AUTHORS"
+    C -> DB: Récupère databaseInfo
+    DB --> C: Retourne authorsFilesStats, authorsTotalStats
+    
+    C -> C: Filtre fichiers selon selectedFiles
+    note right: Applique filtres:\n- Fichiers spécifiques\n- Patterns (wildcards)\n- Expressions régulières
+    
+    C -> C: createFileAuthorsHierarchy(filteredFiles)
+    note right: Crée structure:\nGroupe de fichiers\n├── Auteur A (contributeur)\n├── Auteur B (contributeur)\n└── Auteur C (contributeur)
+    
+    C -> C: Calcule tailles des auteurs
+    note right: Selon sizeMetric:\n- MOST_COMMITS: nb_commits\n- MOST_CONTRIBS: nb_line_change\npar auteur sur les fichiers sélectionnés
+end
+
+C -> C: pack() - Calcule positions des éléments
+
+== 4. Affichage des auteurs contributeurs ==
+C --> O: Affiche graphique avec:
+note right: Visualisation:\n• Groupe principal (fichier/pattern)\n• Cercles pour chaque auteur\n• Taille proportionnelle aux contributions\n• Couleurs distinctes par auteur
+
+@enduml

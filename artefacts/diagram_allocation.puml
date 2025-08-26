@@ -1,0 +1,63 @@
+@startuml
+!define NODE node
+!define ARTIFACT artifact
+
+title Diagramme d'allocation - Git Truck Visualizer (Haut niveau)
+
+NODE "Client Browser" as browser {
+  ARTIFACT "React Application" as reactapp {
+    COMPONENT "Chart.tsx"
+    COMPONENT "DetailsCard.tsx"
+    COMPONENT "Options.tsx"
+    COMPONENT "BarChart.tsx"
+    COMPONENT "FileSelector.tsx"
+    COMPONENT "UI_Fragments.tsx"
+  }
+  
+  ARTIFACT "State Management" as state {
+    COMPONENT "OptionsContext"
+    COMPONENT "DataContext.tsx"
+    COMPONENT "ClickedContext.tsx"
+    COMPONENT "Event_Handlers.tsx"
+    COMPONENT "State_Updates.tsx"
+  }
+}
+
+NODE "Remix Server" as server {
+  ARTIFACT "Web Server" as webserver {
+    COMPONENT "Routes"
+    COMPONENT "Loaders"
+    COMPONENT "Actions"
+  }
+  
+  ARTIFACT "Data Analysis" as analysis {
+    COMPONENT "Git Parser"
+    COMPONENT "Statistics Engine"
+    COMPONENT "Hierarchy Builder"
+  }
+}
+
+NODE "File System" as filesystem {
+  ARTIFACT "Git Repository" as gitrepo {
+    COMPONENT "Commit History"
+    COMPONENT "File Tree"
+    COMPONENT "Author Data"
+  }
+  
+  ARTIFACT "Application Cache" as cache {
+    COMPONENT "Processed Data"
+    COMPONENT "Query Results"
+  }
+}
+
+' Connexions principales
+browser --> server : "HTTP/HTTPS"
+server --> filesystem : "File I/O"
+
+' Communications internes
+reactapp --> state : "reads/updates state"
+webserver --> analysis : "processes"
+analysis --> gitrepo : "reads"
+analysis --> cache : "caches"
+
+@enduml

@@ -1,0 +1,30 @@
+@startuml
+title Cas d'utilisation 4 : Affichage des détails pour un groupement
+
+participant "Chart.tsx" as C
+participant "DetailsCard.tsx" as DC
+participant "DatabaseInfo" as DB
+
+note over C: Pré-condition: Un groupe est déjà sélectionné (clickedObject existe)
+
+== Affichage des détails du groupement ==
+C --> DC: Notification via useClickedObject()
+DC -> DC: useEffect() - clickedObject changed
+DC -> DC: if (!clickedObject) return null
+
+alt clickedObject.type === "tree" && !isAuthor
+    DC -> DC: Rendu des détails du groupement
+    
+    == Informations générales ==
+    DC -> DB: databaseInfo.commitCounts[clickedObject.path]
+    DB --> DC: commitCount
+    
+    DC -> DC: FileAndSubfolderCountEntries(clickedTree)
+    note right: Calcule folderCount et fileCount\nà partir de clickedTree.children
+    
+    DC -> DC: CommitsEntry(commitCount)
+    DC -> DC: LastchangedEntry(lastChanged)
+    DC -> DC: PathEntry(clickedObject.path)
+end
+
+@enduml

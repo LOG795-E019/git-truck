@@ -3,6 +3,8 @@ import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { type Fetcher, Form, useFetcher, useLocation, useNavigation } from "@remix-run/react"
 import type { GitObject, GitTreeObject } from "~/analyzer/model"
 import { AuthorDistFragment } from "~/components/AuthorDistFragment"
+import { FileDistributionFragment } from "~/components/FileDistributionFragment"
+import { RelationshipDistFragment } from "~/components/RelationshipDistFragment"
 import { ChevronButton } from "~/components/ChevronButton"
 import { CloseButton } from "~/components/util"
 import { useClickedObject } from "~/contexts/ClickedContext"
@@ -18,6 +20,12 @@ import { useMetrics } from "~/contexts/MetricContext"
 import { MenuItem, MenuTab } from "./MenuTab"
 import { CommitsCard } from "./CommitsCard"
 import { usePrefersLightMode } from "~/styling"
+
+export interface AuthorContributionData {
+  author: string;
+  contribs: number;
+  commitsOnPath?: number;
+}
 
 function OneFolderOut(path: string) {
   const index = path.lastIndexOf("/")
@@ -36,13 +44,15 @@ export function DetailsCard({
 }) {
   const { setClickedObject, clickedObject } = useClickedObject()
   const location = useLocation()
-  const { metricType } = useOptions()
+  const { chartType, sizeMetric, metricType, groupingType } = useOptions()
   const { state } = useNavigation()
   const { setPath, path } = usePath()
   const { databaseInfo } = useData()
   const isProcessingHideRef = useRef(false)
   const [commitCount, setCommitCount] = useState<number | null>(null)
   const slicedPath = useMemo(() => clickedObject?.path ?? "", [clickedObject])
+  const [showPercent, setShowPercent] = useState<boolean>(false)
+  const [, authorColors] = useMetrics(); 
 
   const existingCommitCount = databaseInfo.commitCounts[slicedPath]
 
@@ -58,8 +68,11 @@ export function DetailsCard({
 
   function fetchCommitCount() {
     const searchParams = new URLSearchParams()
+    console.log("metricType", sizeMetric)
     searchParams.set("branch", databaseInfo.branch)
     searchParams.set("repo", databaseInfo.repo)
+    searchParams.set("grouping", groupingType)
+    searchParams.set("metric", sizeMetric)
     if (!clickedObject?.path) return
     searchParams.set("path", clickedObject.path)
     commitFetcher.load(`/commitcount?${searchParams.toString()}`)
@@ -72,7 +85,7 @@ export function DetailsCard({
     }
   }, [commitFetcher])
 
-  const [authorContributions, setAuthorContributions] = useState<{ author: string; contribs: number }[] | null>(null)
+  const [authorContributions, setAuthorContributions] = useState<AuthorContributionData[] | null>(null)
   const contribSum = useMemo(() => {
     if (!authorContributions) return 0
     return authorContributions.reduce((acc, curr) => acc + curr.contribs, 0)
@@ -86,13 +99,15 @@ export function DetailsCard({
     searchParams.set("repo", databaseInfo.repo)
     if (!clickedObject?.path) return
     searchParams.set("path", clickedObject.path)
+    searchParams.set("grouping", groupingType)
+    searchParams.set("metric", sizeMetric)
     searchParams.set("isblob", String(clickedObject.type === "blob"))
     fetcher.load(`/authordist?${searchParams.toString()}`)
-  }, [clickedObject, databaseInfo])
+  }, [clickedObject, databaseInfo, sizeMetric])
 
   useEffect(() => {
     if (fetcher.state === "idle") {
-      const data = (fetcher.data ?? []) as { author: string; contribs: number }[]
+      const data = (fetcher.data ?? []) as AuthorContributionData[]
       setAuthorContributions(data)
     }
   }, [fetcher])
@@ -108,7 +123,7 @@ export function DetailsCard({
   useEffect(() => {
     // Update clickedObject if data changes
     setClickedObject((clickedObject) => findObjectInTree(databaseInfo.fileTree, clickedObject))
-  }, [databaseInfo, setClickedObject])
+  }, [databaseInfo, setClickedObject, ])
 
   const [metricsData] = useMetrics()
   const { backgroundColor, lightBackground } = useMemo(() => {
@@ -133,23 +148,128 @@ export function DetailsCard({
   const isBlob = clickedObject.type === "blob"
   const extension = last(clickedObject.name.split("."))
   // TODO: handle binary file properly or remove the entry
+  
+  if ((chartType === "AUTHOR_GRAPH" || groupingType === "FILE_AUTHORS") && clickedObject.path.includes("/@")) {
+    if (!clickedObject || !clickedObject.path.includes("/@")) return null;
+
+    const authorName = clickedObject.name;
+    const stats = databaseInfo.authorsTotalStats[authorName];
+    const color = authorColors.get(authorName) ?? "#ccc";
+    // Add safety check for stats
+    if (!stats) {
+        // Clear clickedObject when switching to author graph with incompatible object
+        setClickedObject(null);
+        return null;
+    }
+    let metricString = "Nb Lines Changed";
+    if (sizeMetric === "MOST_COMMITS") {
+      metricString = "Nb Commits";
+    }
+
+    return (
+      <div
+        className={clsx(className, "card flex flex-col gap-2 transition-colors", {
+          "text-gray-100": !lightBackground,
+          "text-gray-800": lightBackground
+        })}
+        style={{ backgroundColor: color }}
+      >
+        <div className="flex">
+          <h2 className="card__title grid w-full grid-cols-[auto,1fr,auto] gap-2">
+            <Icon path={mdiAccountMultiple} size="1.25em" />
+            <span className="truncate" title={authorName}>
+              {authorName}
+            </span>
+            <CloseButton absolute={false} onClick={() => setClickedObject(null)} />
+          </h2>
+        </div>
+        <MenuTab>
+          <MenuItem title="General">
+            <div className="flex grow flex-col gap-2">
+              <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1">
+                <div className="flex grow items-center overflow-hidden overflow-ellipsis whitespace-pre text-sm font-semibold">
+                  Commits
+                </div>
+                <p className="break-all text-sm">{stats?.nb_commits ?? 0}</p>
+                <div className="flex grow items-center overflow-hidden overflow-ellipsis whitespace-pre text-sm font-semibold">
+                  Line changes
+                </div>
+                <p className="break-all text-sm">{stats?.nb_line_change ?? 0}</p>
+              </div>
+              
+              {/* Show file-specific stats for FILE_AUTHORS grouping */}
+              {groupingType === "FILE_AUTHORS" && (
+                <div className="card bg-white/70 text-black mt-2">
+                  <h3 className="font-bold mb-2">Contribution to Selected File(s)</h3>
+                  <FileSpecificAuthorStats authorName={authorName} />
+                </div>
+              )}
+              
+              <div className="card bg-white/70 text-black">
+                <div className="flex gap-2 mb-2">
+                  <button
+                    className={`btn btn-xs ${showPercent ? "btn--primary" : ""}`}
+                    onClick={() => setShowPercent(true)}
+                  >
+                    Percentages
+                  </button>
+                  <button
+                    className={`btn btn-xs ${!showPercent ? "btn--primary" : ""}`}
+                    onClick={() => setShowPercent(false)}
+                  >
+                    Raw Numbers
+                  </button>
+                </div>
+                <h3 className="font-bold">File Distribution for {metricString}</h3>
+                <FileDistributionFragment
+                  author={authorName}
+                  showPercent={showPercent}
+                  show={true}
+                  sizeMetric={sizeMetric}
+                />
+              </div>
+              
+              <div className="card bg-white/70 text-black">
+                <div className="flex gap-2 mb-2">
+                  <button
+                    className={`btn btn-xs ${showPercent ? "btn--primary" : ""}`}
+                    onClick={() => setShowPercent(true)}
+                  >
+                    Percentages
+                  </button>
+                  <button
+                    className={`btn btn-xs ${!showPercent ? "btn--primary" : ""}`}
+                    onClick={() => setShowPercent(false)}
+                  >
+                    Raw Numbers
+                  </button>
+                </div>
+                <h3 className="font-bold">Relationship Distribution with {metricString}</h3>
+                <RelationshipDistFragment
+                  author={authorName}
+                  show={true}
+                  showPercent={showPercent}
+                  sizeMetric={sizeMetric}
+                />
+              </div>
+            </div>
+          </MenuItem>
+        </MenuTab>
+      </div>
+    )
+  }
+
   return (
     <div
       className={clsx(className, "card flex flex-col gap-2 transition-colors", {
         "text-gray-100": !lightBackground,
         "text-gray-800": lightBackground
       })}
-      {...(backgroundColor
-        ? {
-            style: {
-              backgroundColor
-            }
-          }
-        : {})}
+      style={{ backgroundColor: backgroundColor ?? undefined }}
     >
       <div className="flex">
         <h2 className="card__title grid w-full grid-cols-[auto,1fr,auto] gap-2">
-          <Icon path={clickedObject.type === "blob" ? mdiFile : mdiFolder} size="1.25em" />
+          <Icon path={isBlob ? mdiFile : mdiFolder} size="1.25em" />
           <span className="truncate" title={clickedObject.name}>
             {clickedObject.name}
           </span>
@@ -172,7 +292,21 @@ export function DetailsCard({
               <PathEntry path={clickedObject.path} />
             </div>
             <div className="card bg-white/70 text-black">
-              <AuthorDistribution authors={authorContributions} contribSum={contribSum} fetcher={fetcher} />
+              <div className="flex gap-2 mb-2">
+                <button
+                  className={`btn btn-xs ${showPercent ? "btn--primary" : ""}`}
+                  onClick={() => setShowPercent(true)}
+                >
+                  Percentages
+                </button>
+                <button
+                  className={`btn btn-xs ${!showPercent ? "btn--primary" : ""}`}
+                  onClick={() => setShowPercent(false)}
+                >
+                  Raw Numbers
+                </button>
+              </div>
+              <AuthorDistribution authors={authorContributions} contribSum={contribSum} fetcher={fetcher} showPercent={showPercent} size_metric={sizeMetric} />
             </div>
           </div>
           <div className="mt-2 flex gap-2">
@@ -359,26 +493,32 @@ function SizeEntry(props: { size: number; isBinary?: boolean }) {
 const authorCutoff = 2
 
 function AuthorDistribution(props: {
-  authors: { author: string; contribs: number }[] | null
+  authors: AuthorContributionData[] | null
   contribSum: number
   fetcher: Fetcher
+  showPercent: boolean
+  size_metric: string
 }) {
   const authorDistributionExpandId = useId()
 
   const [collapsed, setCollapsed] = useState<boolean>(true)
-
+  let metricString = "Nb Lines Changed"
+  if (props.size_metric === "MOST_COMMITS") {
+    metricString = "Nb Commits"
+  }
   const authorsAreCutoff = (props.authors?.length ?? 0) > authorCutoff + 1
   return (
     <div className="flex flex-col gap-2">
       <div className={`flex justify-between ${authorsAreCutoff ? "cursor-pointer hover:opacity-70" : ""}`}>
         <label className="label grow" htmlFor={authorDistributionExpandId}>
-          <h3 className="font-bold">Author distribution</h3>
+          <h3 className="font-bold">Author distribution for {metricString}</h3>
         </label>
         {authorsAreCutoff ? (
           <ChevronButton id={authorDistributionExpandId} open={!collapsed} onClick={() => setCollapsed(!collapsed)} />
         ) : null}
       </div>
-      <div className="grid grid-cols-[1fr,auto] gap-1">
+      {}
+      <div className="flex flex-col gap-2">
         {props.fetcher.state !== "idle" ? (
           <p>Loading authors...</p>
         ) : (
@@ -389,11 +529,13 @@ function AuthorDistribution(props: {
                   show={true}
                   items={props.authors?.slice(0, authorCutoff) ?? []}
                   contribSum={props.contribSum}
+                  showPercent={props.showPercent}
                 />
                 <AuthorDistFragment
                   show={!collapsed}
                   items={props.authors?.slice(authorCutoff) ?? []}
                   contribSum={props.contribSum}
+                  showPercent={props.showPercent}
                 />
                 {collapsed ? (
                   <button
@@ -407,7 +549,7 @@ function AuthorDistribution(props: {
             ) : (
               <>
                 {(props.authors ?? []).length > 0 && hasContributions(props.authors) ? (
-                  <AuthorDistFragment show={true} items={props.authors ?? []} contribSum={props.contribSum} />
+                  <AuthorDistFragment show={true} items={props.authors ?? []} contribSum={props.contribSum} showPercent= {props.showPercent}/>
                 ) : (
                   <p>No authors found</p>
                 )}
@@ -420,10 +562,51 @@ function AuthorDistribution(props: {
   )
 }
 
-function hasContributions(authors?: { author: string; contribs: number }[] | null) {
+function hasContributions(authors?: AuthorContributionData[] | null) {
   if (!authors) return false
   for (const { contribs } of authors) {
     if (contribs > 0) return true
   }
   return false
+}
+
+// Add this component within DetailsCard.tsx or as a separate component:
+
+function FileSpecificAuthorStats({ authorName }: { authorName: string }) {
+  const { databaseInfo } = useData()
+  const { selectedFilePaths, sizeMetric } = useOptions()
+  
+  const fileStats = selectedFilePaths.map(filePath => {
+    const authorFileStats = databaseInfo.authorsFilesStats[authorName]?.[filePath]
+    if (!authorFileStats) return null
+    
+    return {
+      filePath,
+      fileName: filePath.split('/').pop() || filePath,
+      commits: authorFileStats.nb_commits || 0,
+      lineChanges: authorFileStats.nb_line_change || 0
+    }
+  }).filter(Boolean)
+  
+  const metricString = sizeMetric === "MOST_COMMITS" ? "Commits" : "Line Changes"
+  
+  return (
+    <div className="space-y-2">
+      {fileStats.map((stat, index) =>
+        stat ? (
+          <div key={index} className="grid grid-cols-[1fr,auto] gap-2 text-sm">
+            <span className="truncate" title={stat.filePath}>
+              {stat.fileName}
+            </span>
+            <span className="font-mono">
+              {sizeMetric === "MOST_COMMITS" ? stat.commits : stat.lineChanges}
+            </span>
+          </div>
+        ) : null
+      )}
+      {fileStats.length === 0 && (
+        <p className="text-sm text-gray-600">No contributions to selected files</p>
+      )}
+    </div>
+  )
 }

@@ -1,0 +1,33 @@
+@startuml
+title Cas d'utilisation 3 : Regroupement des fichiers par auteurs
+
+participant "Options.tsx" as O
+participant "OptionsContext" as OC
+participant "Chart.tsx" as C
+participant "DetailsCard.tsx" as DC
+participant "DatabaseInfo" as DB
+
+note over DB: Pré-condition: Repository Git avec au moins un fichier
+
+note right: EnumSelect onChange(groupingType: GroupingType)
+O -> OC: setGroupingType("AUTHOR_FILES")
+OC -> OC: Met à jour groupingType = "AUTHOR_FILES"
+
+== Mise à jour du graphique ==
+OC --> C: Notifie changement groupingType via useOptions()
+C -> C: Re-render avec nouveau groupingType
+C -> C: createPartitionedHiearchy(groupingType="AUTHOR_FILES")
+
+alt groupingType === "AUTHOR_FILES"
+    C -> DB: Récupère databaseInfo
+    DB --> C: Retourne authorsFilesStats, authorsTotalStats
+    C -> C: createPartitionedHiearchy(databaseInfo): currentTree
+    C -> C: authorFilesHierarchy(databaseInfo, currentTree, sizeMetricOption, authorsFilter)
+    note right: Regroupement des fichiers par auteur:\n- Auteur A: [file1.js, file2.py, ...]\n- Auteur B: [file3.css, file4.html, ...]\n- Auteur C: [file5.ts, file6.json, ...]
+    
+    C -> C: Crée hiérarchie par auteur
+    note right: Structure:\nRoot\n├── Auteur A (groupe)\n│   ├── file1.js\n│   └── file2.py\n├── Auteur B (groupe)\n│   ├── file3.css\n│   └── file4.html\n└── Auteur C (groupe)
+end
+
+C -> C: pack() - Calcule positions des éléments
+@enduml

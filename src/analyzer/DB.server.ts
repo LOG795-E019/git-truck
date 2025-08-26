@@ -337,8 +337,23 @@ export default class DB {
 
   public async getCommitCountForPath(path: string) {
     const res = await this.query(`
-      SELECT COUNT(DISTINCT commithash) AS count from filechanges_commits_renamed_cached WHERE filepath GLOB '${path}*';
+      SELECT COUNT(DISTINCT commithash) AS count 
+      from filechanges_commits_renamed_cached 
+      WHERE filepath GLOB '${path}*';
     `)
+    return Number(res[0]["count"])
+  }
+
+  public async getCommitCountForFileType(path: string, fileType: string) {
+    // fileType should include the dot, e.g. ".tsx"
+    if (!fileType.startsWith(".")) fileType = "." + fileType;
+    console.log("getCommitCountForFileType", path, fileType)
+    const res = await this.query(`
+      SELECT COUNT(DISTINCT commithash) AS count
+      FROM filechanges_commits_renamed_cached
+      WHERE filepath GLOB '${path}*' AND filepath LIKE '%${fileType}';
+    `)
+    console.log("getCommitCountForFileType result", res)
     return Number(res[0]["count"])
   }
 
@@ -523,33 +538,200 @@ export default class DB {
     return { maxCommitCount: Number(res[0]["max_commits"]), minCommitCount: Number(res[0]["min_commits"]) }
   }
 
-  public async getAuthorContribsForPath(path: string, isblob: boolean) {
+  public async getAuthorContribsForPath(
+    path: string,
+    isblob: boolean,
+    metricType: string
+  ) {
+    let selectClause: string;
+    let orderClause: string;
+
+    if (metricType === "COMMITS") {
+      selectClause = "COUNT(DISTINCT commithash) AS contribsum";
+      orderClause = "ORDER BY contribsum DESC, author ASC";
+    } else {
+      selectClause = "SUM(insertions + deletions) AS contribsum";
+      orderClause = "ORDER BY contribsum DESC, author ASC";
+    }
+
     const res = await this.query(`
-      SELECT author, SUM(insertions + deletions) AS contribsum FROM filechanges_commits_renamed_cached WHERE filepath ${
+      SELECT author, ${selectClause} FROM filechanges_commits_renamed_cached WHERE filepath ${
         isblob ? "=" : "GLOB"
-      } '${path}${isblob ? "" : "*"}' GROUP BY author ORDER BY contribsum DESC, author ASC;
-    `)
+      } '${path}${isblob ? "" : "*"}' GROUP BY author ${orderClause};
+    `);
+
     return res.map((row) => {
       return { author: row["author"] as string, contribs: Number(row["contribsum"]) }
-    })
+    });
+  }
+
+  public async getAuthorContribsForExtension(
+    path: string,
+    extension: string,
+    metricType: string
+  ) {
+    // Ensure extension starts with a dot
+    if (!extension.startsWith(".")) extension = "." + extension;
+    // Match all files under the path with the given extension
+    const condition = `filepath GLOB '${path}*' AND filepath LIKE '%${extension}'`;
+
+    let selectClause: string;
+    let orderClause: string;
+
+    if (metricType === "COMMITS") {
+      selectClause = "COUNT(DISTINCT commithash) AS contribsum";
+      orderClause = "ORDER BY contribsum DESC, author ASC";
+    } else {
+      selectClause = "SUM(insertions + deletions) AS contribsum";
+      orderClause = "ORDER BY contribsum DESC, author ASC";
+    }
+
+    const res = await this.query(`
+      SELECT author, ${selectClause}
+      FROM filechanges_commits_renamed_cached
+      WHERE ${condition}
+      GROUP BY author
+      ${orderClause};
+    `);
+
+    return res.map((row) => ({
+      author: row["author"] as string,
+      contribs: Number(row["contribsum"])
+    }));
+  }
+
+  public async getAuthorContribsForKeyword(
+    path: string,
+    extension: string,
+    metricType: string
+  ) {
+    // Remove any leading dot from extension if present
+    const cleanExtension = extension.startsWith(".") ? extension.substring(1) : extension;
+    // Build the condition to match files under the path containing the extension/keyword
+    const condition = `filepath GLOB '${path}*' AND filepath LIKE '%${cleanExtension}%'`;
+
+    let selectClause: string;
+    let orderClause: string;
+
+    if (metricType === "COMMITS") {
+      selectClause = "COUNT(DISTINCT commithash) AS contribsum";
+      orderClause = "ORDER BY contribsum DESC, author ASC";
+    } else {
+      selectClause = "SUM(insertions + deletions) AS contribsum";
+      orderClause = "ORDER BY contribsum DESC, author ASC";
+    }
+
+    const res = await this.query(`
+      SELECT author, ${selectClause}
+      FROM filechanges_commits_renamed_cached
+      WHERE ${condition}
+      GROUP BY author
+      ${orderClause};
+    `);
+
+    return res.map((row) => ({
+      author: row["author"] as string,
+      contribs: Number(row["contribsum"])
+    }));
+  }
+
+  public async getAuthorCommitsAndLinesForPath(author: string, path: string, isBlob: boolean): Promise<{ commits: number } | null> {
+    const queryCondition = isBlob ? `filepath = '${path}'` : `filepath GLOB '${path}*'`;
+    const res = await this.query(`
+      SELECT
+        COUNT(DISTINCT commithash) AS nb_commits,
+      FROM filechanges_commits_renamed_cached
+      WHERE author = '${author}' AND ${queryCondition};
+    `);
+
+    if (res.length > 0) {
+      return {
+        commits: Number(res[0]["nb_commits"])
+      };
+    }
+    return null;
+  }
+
+  public async getAuthorsFileStats(): Promise<Record<string, Record<string, { nb_commits: number; nb_line_change: number }>>> {
+    const res = await this.query(`
+      SELECT author, filepath,
+            COUNT(DISTINCT commithash) AS nb_commits,
+            SUM(insertions + deletions) AS nb_line_change
+      FROM filechanges_commits_renamed_cached
+      GROUP BY author, filepath
+      ORDER BY author ASC, filepath ASC;
+    `);
+
+    const result: Record<string, Record<string, { nb_commits: number; nb_line_change: number }>> = {};
+
+    res.forEach((row) => {
+      const author = row["author"] as string;
+      const filepath = row["filepath"] as string;
+      const nb_commits = Number(row["nb_commits"]);
+      const nb_line_change = Number(row["nb_line_change"]);
+
+      if (!result[author]) result[author] = {};
+      result[author][filepath] = { nb_commits, nb_line_change };
+    });
+
+    return result;
+  }
+
+  public async getAuthorsTotalStats(): Promise<Record<string, { nb_commits: number; nb_line_change: number }>> {
+    const commitRes = await this.query(`
+      SELECT author, commithash, SUM(insertions + deletions) AS nb_line_change
+      FROM filechanges_commits_renamed_cached
+      GROUP BY author, commithash
+    `);
+
+    const authorCommits: Record<string, Set<string>> = {};
+    const authorLineChange: Record<string, number> = {};
+
+    commitRes.forEach((row) => {
+      const author = row["author"] as string;
+      const commithash = row["commithash"] as string;
+      const nb_line_change = Number(row["nb_line_change"]);
+      if (!authorCommits[author]) authorCommits[author] = new Set();
+      if (!authorLineChange[author]) authorLineChange[author] = 0;
+      authorCommits[author].add(commithash);
+      authorLineChange[author] += nb_line_change;
+    });
+
+    const result: Record<string, { nb_commits: number; nb_line_change: number }> = {};
+    Object.keys(authorCommits).forEach((author) => {
+      result[author] = {
+        nb_commits: authorCommits[author].size,
+        nb_line_change: authorLineChange[author]
+      };
+    });
+
+    return result;
   }
 
   private getTimeStringFormat(timerange: [number, number]) {
-    const durationDays = (timerange[1] - timerange[0]) / (60 * 60 * 24)
-    if (durationDays < 150) return ["%a %-d %B %Y", "day"]
-    if (durationDays < 1000) return ["Week %V %Y", "week"]
-    if (durationDays < 4000) return ["%B %Y", "month"]
-    return ["%Y", "year"]
+    const durationDays = (timerange[1] - timerange[0]) / (60 * 60 * 24);
+    if (durationDays <= 90) return ["%a %-d %B %Y", "day"];
+    if (durationDays <= 1000) return ["Week %V %Y", "week"];
+    if (durationDays < 4000) return ["%B %Y", "month"];
+    return ["%Y", "year"];
   }
 
   public async getCommitCountPerTime(timerange: [number, number]) {
     const [query, timeUnit] = this.getTimeStringFormat(timerange)
     const res = await this.query(`
-      SELECT strftime(date, '${query}') as timestring, count(*) AS count, MIN(committertime) AS ct FROM (SELECT date_trunc('${timeUnit}',to_timestamp(committertime)) AS date, committertime FROM commits) GROUP BY date ORDER BY date ASC;
+      SELECT strftime(date, '${query}') as timestring, count(*) AS count, MIN(committertime) AS ct 
+      FROM (
+        SELECT date_trunc('${timeUnit}', to_timestamp(committertime)) AS date, committertime 
+        FROM commits 
+        WHERE committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+      ) 
+      GROUP BY date 
+      ORDER BY date ASC;
     `)
     const mapped = res.map((x) => {
       return { date: x["timestring"] as string, count: Number(x["count"]), timestamp: Number(x["ct"]) }
     })
+
     const final: {
       date: string
       count: number
@@ -561,6 +743,49 @@ export default class DB {
       if (existing) final.push(existing)
       else final.push({ date: dateString, count: 0, timestamp })
     }
+    const sorted = final.sort((a, b) => a.timestamp - b.timestamp)
+    return sorted
+  }
+
+  public async getLineChangePerTime(timerange: [number, number]) {
+    const [query, timeUnit] = this.getTimeStringFormat(timerange)
+    const res = await this.query(`
+      SELECT strftime(date, '${query}') as timestring, 
+            SUM(insertions + deletions) AS total_changes, 
+            MIN(committertime) AS ct 
+      FROM (
+        SELECT date_trunc('${timeUnit}', to_timestamp(fc.committertime)) AS date, 
+              fc.committertime,
+              fc.insertions,
+              fc.deletions
+        FROM filechanges_commits_renamed_cached fc
+        WHERE fc.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+      ) 
+      GROUP BY date 
+      ORDER BY date ASC;
+    `)
+    
+    const mapped = res.map((x) => {
+      return { 
+        date: x["timestring"] as string, 
+        count: Number(x["total_changes"]), 
+        timestamp: Number(x["ct"]) 
+      }
+    })
+
+    const final: {
+      date: string
+      count: number
+      timestamp: number
+    }[] = []
+    
+    const allIntervals = getTimeIntervals(timeUnit, timerange[0], timerange[1])
+    for (const [dateString, timestamp] of allIntervals) {
+      const existing = mapped.find((x) => x.date === dateString)
+      if (existing) final.push(existing)
+      else final.push({ date: dateString, count: 0, timestamp })
+    }
+    
     const sorted = final.sort((a, b) => a.timestamp - b.timestamp)
     return sorted
   }
