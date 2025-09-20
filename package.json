@@ -41,12 +41,12 @@
     "@mdi/js": "^7.3.67",
     "@mdi/react": "^1.6.1",
     "@playwright/test": "^1.50.1",
-    "@remix-run/dev": "2.2.0",
-    "@remix-run/eslint-config": "2.2.0",
-    "@remix-run/express": "^2.2.0",
-    "@remix-run/node": "2.2.0",
-    "@remix-run/react": "2.2.0",
-    "@remix-run/serve": "2.2.0",
+    "@remix-run/dev": "^2.17.1",
+    "@remix-run/eslint-config": "^2.17.1",
+    "@remix-run/express": "^2.17.1",
+    "@remix-run/node": "^2.17.1",
+    "@remix-run/react": "^2.17.1",
+    "@remix-run/serve": "^2.17.1",
     "@styled-icons/material": "^10.47.0",
     "@styled-icons/material-outlined": "^10.47.0",
     "@styled-icons/octicons": "^10.47.0",
@@ -118,7 +118,7 @@
     "tailwindcss": "^3.4.1",
     "tiny-invariant": "^1.3.1",
     "ts-jest": "^29.1.1",
-    "tsup": "^7.2.0",
+    "tsup": "^8.5.0",
     "typescript": "^5.2.2",
     "uniqolor": "^1.1.0",
     "yargs": "^17.7.2"
@@ -160,6 +160,7 @@
   "homepage": "https://github.com/git-truck/git-truck#readme",
   "dependencies": {
     "@duckdb/node-api": "^1.1.3-alpha.11",
+    "esbuild": "^0.25.10",
     "minimatch": "^10.0.3"
   }
 }
