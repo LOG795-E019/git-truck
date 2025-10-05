@@ -206,7 +206,7 @@ export function Providers({ children, data }: ProvidersProps) {
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           fileGroups
         })),
-      setFileAuthorMode: (mode: 'groups' | 'individual') =>
+      setFileAuthorMode: (mode: "groups" | "individual") =>
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           fileAuthorMode: mode

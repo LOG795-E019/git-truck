@@ -24,18 +24,18 @@ export function RelationshipDistFragment(props: RelationshipDistFragProps) {
 
   // Prepare entries
   const entries = Object.entries(authorRelationships)
-  .sort((a, b) => {
-    const aTotal = (a[1].author1Contribs[searched_Stat] ?? 0) + (a[1].author2Contribs[searched_Stat] ?? 0)
-    const bTotal = (b[1].author1Contribs[searched_Stat] ?? 0) + (b[1].author2Contribs[searched_Stat] ?? 0)
-    return bTotal - aTotal
-  })
-  .slice(0, 5)
+    .sort((a, b) => {
+      const aTotal = (a[1].author1Contribs[searched_Stat] ?? 0) + (a[1].author2Contribs[searched_Stat] ?? 0)
+      const bTotal = (b[1].author1Contribs[searched_Stat] ?? 0) + (b[1].author2Contribs[searched_Stat] ?? 0)
+      return bTotal - aTotal
+    })
+    .slice(0, 5)
 
   return (
     <div className="grid grid-cols-[1fr,auto,auto] gap-1">
       <div className="font-semibold">Co-author</div>
-      <div className="font-semibold text-right">Current Author{}</div>
-      <div className="font-semibold text-right">Co-Author</div>
+      <div className="text-right font-semibold">Current Author{}</div>
+      <div className="text-right font-semibold">Co-Author</div>
       {entries.map(([author2, relData]) => {
         const author1Value = relData.author1Contribs[searched_Stat] ?? 0
         const author2Value = relData.author2Contribs[searched_Stat] ?? 0
@@ -50,7 +50,9 @@ export function RelationshipDistFragment(props: RelationshipDistFragProps) {
 
         return (
           <Fragment key={author2}>
-            <div className="truncate font-bold opacity-80" title={author2}>{author2}</div>
+            <div className="truncate font-bold opacity-80" title={author2}>
+              {author2}
+            </div>
             <div className="break-all text-right text-sm">
               {props.showPercent ? `${author1Display}%` : author1Value}
             </div>

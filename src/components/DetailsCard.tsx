@@ -22,9 +22,9 @@ import { CommitsCard } from "./CommitsCard"
 import { usePrefersLightMode } from "~/styling"
 
 export interface AuthorContributionData {
-  author: string;
-  contribs: number;
-  commitsOnPath?: number;
+  author: string
+  contribs: number
+  commitsOnPath?: number
 }
 
 function OneFolderOut(path: string) {
@@ -52,7 +52,7 @@ export function DetailsCard({
   const [commitCount, setCommitCount] = useState<number | null>(null)
   const slicedPath = useMemo(() => clickedObject?.path ?? "", [clickedObject])
   const [showPercent, setShowPercent] = useState<boolean>(false)
-  const [, authorColors] = useMetrics(); 
+  const [, authorColors] = useMetrics()
 
   const existingCommitCount = databaseInfo.commitCounts[slicedPath]
 
@@ -123,7 +123,7 @@ export function DetailsCard({
   useEffect(() => {
     // Update clickedObject if data changes
     setClickedObject((clickedObject) => findObjectInTree(databaseInfo.fileTree, clickedObject))
-  }, [databaseInfo, setClickedObject, ])
+  }, [databaseInfo, setClickedObject])
 
   const [metricsData] = useMetrics()
   const { backgroundColor, lightBackground } = useMemo(() => {
@@ -148,22 +148,22 @@ export function DetailsCard({
   const isBlob = clickedObject.type === "blob"
   const extension = last(clickedObject.name.split("."))
   // TODO: handle binary file properly or remove the entry
-  
-  if ((chartType === "AUTHOR_GRAPH" || groupingType === "FILE_AUTHORS") && clickedObject.path.includes("/@")) {
-    if (!clickedObject || !clickedObject.path.includes("/@")) return null;
 
-    const authorName = clickedObject.name;
-    const stats = databaseInfo.authorsTotalStats[authorName];
-    const color = authorColors.get(authorName) ?? "#ccc";
+  if ((chartType === "AUTHOR_GRAPH" || groupingType === "FILE_AUTHORS") && clickedObject.path.includes("/@")) {
+    if (!clickedObject || !clickedObject.path.includes("/@")) return null
+
+    const authorName = clickedObject.name
+    const stats = databaseInfo.authorsTotalStats[authorName]
+    const color = authorColors.get(authorName) ?? "#ccc"
     // Add safety check for stats
     if (!stats) {
-        // Clear clickedObject when switching to author graph with incompatible object
-        setClickedObject(null);
-        return null;
+      // Clear clickedObject when switching to author graph with incompatible object
+      setClickedObject(null)
+      return null
     }
-    let metricString = "Nb Lines Changed";
+    let metricString = "Nb Lines Changed"
     if (sizeMetric === "MOST_COMMITS") {
-      metricString = "Nb Commits";
+      metricString = "Nb Commits"
     }
 
     return (
@@ -196,17 +196,17 @@ export function DetailsCard({
                 </div>
                 <p className="break-all text-sm">{stats?.nb_line_change ?? 0}</p>
               </div>
-              
+
               {/* Show file-specific stats for FILE_AUTHORS grouping */}
               {groupingType === "FILE_AUTHORS" && (
-                <div className="card bg-white/70 text-black mt-2">
-                  <h3 className="font-bold mb-2">Contribution to Selected File(s)</h3>
+                <div className="card mt-2 bg-white/70 text-black">
+                  <h3 className="mb-2 font-bold">Contribution to Selected File(s)</h3>
                   <FileSpecificAuthorStats authorName={authorName} />
                 </div>
               )}
-              
+
               <div className="card bg-white/70 text-black">
-                <div className="flex gap-2 mb-2">
+                <div className="mb-2 flex gap-2">
                   <button
                     className={`btn btn-xs ${showPercent ? "btn--primary" : ""}`}
                     onClick={() => setShowPercent(true)}
@@ -228,9 +228,9 @@ export function DetailsCard({
                   sizeMetric={sizeMetric}
                 />
               </div>
-              
+
               <div className="card bg-white/70 text-black">
-                <div className="flex gap-2 mb-2">
+                <div className="mb-2 flex gap-2">
                   <button
                     className={`btn btn-xs ${showPercent ? "btn--primary" : ""}`}
                     onClick={() => setShowPercent(true)}
@@ -292,7 +292,7 @@ export function DetailsCard({
               <PathEntry path={clickedObject.path} />
             </div>
             <div className="card bg-white/70 text-black">
-              <div className="flex gap-2 mb-2">
+              <div className="mb-2 flex gap-2">
                 <button
                   className={`btn btn-xs ${showPercent ? "btn--primary" : ""}`}
                   onClick={() => setShowPercent(true)}
@@ -306,7 +306,13 @@ export function DetailsCard({
                   Raw Numbers
                 </button>
               </div>
-              <AuthorDistribution authors={authorContributions} contribSum={contribSum} fetcher={fetcher} showPercent={showPercent} size_metric={sizeMetric} />
+              <AuthorDistribution
+                authors={authorContributions}
+                contribSum={contribSum}
+                fetcher={fetcher}
+                showPercent={showPercent}
+                size_metric={sizeMetric}
+              />
             </div>
           </div>
           <div className="mt-2 flex gap-2">
@@ -549,7 +555,12 @@ function AuthorDistribution(props: {
             ) : (
               <>
                 {(props.authors ?? []).length > 0 && hasContributions(props.authors) ? (
-                  <AuthorDistFragment show={true} items={props.authors ?? []} contribSum={props.contribSum} showPercent= {props.showPercent}/>
+                  <AuthorDistFragment
+                    show={true}
+                    items={props.authors ?? []}
+                    contribSum={props.contribSum}
+                    showPercent={props.showPercent}
+                  />
                 ) : (
                   <p>No authors found</p>
                 )}
@@ -575,21 +586,23 @@ function hasContributions(authors?: AuthorContributionData[] | null) {
 function FileSpecificAuthorStats({ authorName }: { authorName: string }) {
   const { databaseInfo } = useData()
   const { selectedFilePaths, sizeMetric } = useOptions()
-  
-  const fileStats = selectedFilePaths.map(filePath => {
-    const authorFileStats = databaseInfo.authorsFilesStats[authorName]?.[filePath]
-    if (!authorFileStats) return null
-    
-    return {
-      filePath,
-      fileName: filePath.split('/').pop() || filePath,
-      commits: authorFileStats.nb_commits || 0,
-      lineChanges: authorFileStats.nb_line_change || 0
-    }
-  }).filter(Boolean)
-  
+
+  const fileStats = selectedFilePaths
+    .map((filePath) => {
+      const authorFileStats = databaseInfo.authorsFilesStats[authorName]?.[filePath]
+      if (!authorFileStats) return null
+
+      return {
+        filePath,
+        fileName: filePath.split("/").pop() || filePath,
+        commits: authorFileStats.nb_commits || 0,
+        lineChanges: authorFileStats.nb_line_change || 0
+      }
+    })
+    .filter(Boolean)
+
   const metricString = sizeMetric === "MOST_COMMITS" ? "Commits" : "Line Changes"
-  
+
   return (
     <div className="space-y-2">
       {fileStats.map((stat, index) =>
@@ -598,15 +611,11 @@ function FileSpecificAuthorStats({ authorName }: { authorName: string }) {
             <span className="truncate" title={stat.filePath}>
               {stat.fileName}
             </span>
-            <span className="font-mono">
-              {sizeMetric === "MOST_COMMITS" ? stat.commits : stat.lineChanges}
-            </span>
+            <span className="font-mono">{sizeMetric === "MOST_COMMITS" ? stat.commits : stat.lineChanges}</span>
           </div>
         ) : null
       )}
-      {fileStats.length === 0 && (
-        <p className="text-sm text-gray-600">No contributions to selected files</p>
-      )}
+      {fileStats.length === 0 && <p className="text-sm text-gray-600">No contributions to selected files</p>}
     </div>
   )
 }

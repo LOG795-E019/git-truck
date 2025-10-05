@@ -14,20 +14,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   invariant(path, "path is required")
   invariant(grouping, "grouping is required")
 
-
   const instance = InstanceManager.getInstance(repo, branch)
   if (!instance) return []
-  if (grouping === "FILE_TYPE"){
+  if (grouping === "FILE_TYPE") {
     const path_adjusted = path.split("/").slice(0, -1).join("/").replace(/^\/+/, "")
-    const extension = path.split('.').pop() || "" // Get the file extension
+    const extension = path.split(".").pop() || "" // Get the file extension
     console.log("path_adjusted", path_adjusted)
     console.log("extension", extension)
     return await instance.db.getCommitCountForFileType(path_adjusted, extension)
-  }else{
+  } else {
     console.log("path:", path)
     console.log("grouping:", grouping)
     return await instance.db.getCommitCountForPath(path)
   }
-  
-  
 }
