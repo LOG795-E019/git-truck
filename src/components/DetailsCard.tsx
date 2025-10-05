@@ -155,6 +155,7 @@ export function DetailsCard({
     const authorName = clickedObject.name
     const stats = databaseInfo.authorsTotalStats[authorName]
     const color = authorColors.get(authorName) ?? "#ccc"
+    const metricString = sizeMetric === "MOST_COMMITS" ? "Nb Commits" : "Nb Lines Changed"
     // Add safety check for stats
     if (!stats) {
       // Clear clickedObject when switching to author graph with incompatible object
