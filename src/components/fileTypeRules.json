@@ -1,4 +1,4 @@
 [
-  { "name": "test", "pattern": "test"},
-  { "name": "config", "pattern": "config"}
+  { "name": "test", "pattern": "test" },
+  { "name": "config", "pattern": "config" }
 ]
