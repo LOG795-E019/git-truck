@@ -121,7 +121,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       selectedAuthors,
       fileGroups,
       selectedFilePaths, // Add this parameter
-      fileAuthorMode     // Add this parameter
+      fileAuthorMode // Add this parameter
     ).descendants()
     console.timeEnd("nodes")
     return res
@@ -153,12 +153,12 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       ? {
           onClick: (evt) => {
             evt.stopPropagation()
-            
+
             // For FILE_AUTHORS grouping, author bubbles should show details
             if (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) {
               return setClickedObject(d.data)
             }
-            
+
             // For other cases, show details
             return setClickedObject(d.data)
           },
@@ -168,7 +168,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       : {
           onClick: (evt) => {
             evt.stopPropagation()
-            
+
             if (isRoot) {
               // Handle root clicks - zoom out
               if (groupingType === "FILE_AUTHORS") {
@@ -182,7 +182,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
               }
             } else {
               // Handle non-root clicks for tree elements
-              
+
               // Special handling for FILE_AUTHORS grouping
               if (groupingType === "FILE_AUTHORS" && fileGroups.length > 1) {
                 // Clicking a group container zooms into that group
@@ -245,10 +245,12 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
             const relationshipsMap = getAuthorsRelationships(databaseInfo)
 
             // Extract unique array of authors from relationshipsMap
-            const authorsInRelationshipMap = Array.from(new Set([
-              ...Object.keys(relationshipsMap),
-              ...Object.values(relationshipsMap).flatMap(rel => Object.keys(rel.Relationships))
-            ]))
+            const authorsInRelationshipMap = Array.from(
+              new Set([
+                ...Object.keys(relationshipsMap),
+                ...Object.values(relationshipsMap).flatMap((rel) => Object.keys(rel.Relationships))
+              ])
+            )
 
             // Get author colors
             const [, authorColors] = useMetrics()
@@ -268,10 +270,11 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                 // Avoid division by zero
                 const author1Percent = totalValue > 0 ? author1Value / totalValue : 0
                 const author2Percent = totalValue > 0 ? author2Value / totalValue : 0
-              
+
                 // Scale thickness (adjust base and scaling as needed)
                 const multiplier = searched_Stat === "nb_commits" ? 10 : 1
-                const baseWidth = Math.max(2, Math.log(totalValue * multiplier + 1)) * (20 / authorsInRelationshipMap.length)
+                const baseWidth =
+                  Math.max(2, Math.log(totalValue * multiplier + 1)) * (20 / authorsInRelationshipMap.length)
                 const strokeWidth1 = baseWidth * author1Percent
                 const strokeWidth2 = baseWidth * author2Percent
                 const color1 = authorColors.get(author1) || "#888"
@@ -314,10 +317,10 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                     className="cursor-pointer transition-opacity hover:opacity-100"
                     onMouseEnter={() => {
                       const tooltipContent = {
-                        type: 'blob', // Use existing type
+                        type: "blob", // Use existing type
                         name: `${author1} ↔ ${author2} : ${searched_Stat}: ${totalValue}`,
                         path: `relationship-${author1}-${author2}`,
-                        sizeInBytes: totalValue, // Use existing property that tooltip reads
+                        sizeInBytes: totalValue // Use existing property that tooltip reads
                         // Add any other properties your tooltip expects
                       }
                       setHoveredObject(tooltipContent as any)
@@ -336,10 +339,10 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                     className="cursor-pointer transition-opacity hover:opacity-100"
                     onMouseEnter={() => {
                       const tooltipContent = {
-                        type: 'blob', // Use existing type
+                        type: "blob", // Use existing type
                         name: `${author1} ↔ ${author2} : ${searched_Stat}: ${totalValue}`,
                         path: `relationship-${author1}-${author2}`,
-                        sizeInBytes: totalValue, // Use existing property that tooltip reads
+                        sizeInBytes: totalValue // Use existing property that tooltip reads
                         // Add any other properties your tooltip expects
                       }
                       setHoveredObject(tooltipContent as any)
@@ -357,21 +360,24 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
             key={d.data.path}
             className={clsx("transition-opacity hover:opacity-60", {
               // Root element always has pointer cursor OR non-root clickable elements
-              "cursor-pointer": i === 0 || (i > 0 && !isTree(d.data) && (
-                // Show pointer cursor for author bubbles in FILE_AUTHORS mode
-                (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) ||
-                // Show pointer cursor for blobs in other modes
-                (groupingType !== "FILE_AUTHORS")
-              )),
-              
+              "cursor-pointer":
+                i === 0 ||
+                (i > 0 &&
+                  !isTree(d.data) &&
+                  // Show pointer cursor for author bubbles in FILE_AUTHORS mode
+                  ((groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) ||
+                    // Show pointer cursor for blobs in other modes
+                    groupingType !== "FILE_AUTHORS")),
+
               // Non-root elements - prioritize zoom cursor over pointer cursor
-              "cursor-zoom-in": i > 0 && isTree(d.data) && (
+              "cursor-zoom-in":
+                i > 0 &&
+                isTree(d.data) &&
                 // Show zoom cursor for group containers in FILE_AUTHORS mode
-                (groupingType === "FILE_AUTHORS" && fileGroups.length > 1 && d.data.path.startsWith("/group-")) ||
-                // Show zoom cursor for regular tree navigation
-                (groupingType !== "FILE_AUTHORS" && isTree(d.data))
-              ),
-              
+                ((groupingType === "FILE_AUTHORS" && fileGroups.length > 1 && d.data.path.startsWith("/group-")) ||
+                  // Show zoom cursor for regular tree navigation
+                  (groupingType !== "FILE_AUTHORS" && isTree(d.data))),
+
               "animate-blink": clickedObject?.path === d.data.path
             })}
             {...createGroupHandlers(d, i === 0)}
@@ -481,36 +487,24 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
       }
     } else if (chartType === "AUTHOR_GRAPH") {
       const datum = d as HierarchyCircularNode<GitObject>
-
-      // Check if this is the outer container (author-network) or an individual author
-      if (d.data.name === "author-network") {
-        // Outer container: rounded rectangle filling the whole space
-        props = {
-          ...props,
-          x: 0,
-          y: 0,
-          width: size.width,
-          height: size.height,
-          rx: 20, // Rounded corners
-          ry: 20,
-          fill: "black", // Make container transparent
-          stroke: "black" // Optional border
-        }
-      } else {
-        // Individual authors: circular bubbles
-        props = {
-          ...props,
-          x: datum.x - datum.r,
-          y: datum.y - datum.r + estimatedLetterHeightForDirText - 1,
-          width: datum.r * 2,
-          height: datum.r * 2,
-          rx: datum.r,
-          ry: datum.r
-        }
+      // Individual authors: circular bubbles
+      props = {
+        ...props,
+        x: datum.x - datum.r,
+        y: datum.y - datum.r + estimatedLetterHeightForDirText - 1,
+        width: datum.r * 2,
+        height: datum.r * 2,
+        rx: datum.r,
+        ry: datum.r
       }
     }
     return props
   }, [d, metricsData, metricType, chartType, groupingType]) // Add groupingType to dependencies
+
+  // Don't render the author-network container node in AUTHOR_GRAPH
+  if (chartType === "AUTHOR_GRAPH" && d.data.name === "author-network") {
+    return null
+  }
 
   return (
     <rect
@@ -669,7 +663,7 @@ function createPartitionedHiearchy(
   selectedAuthors: string[],
   fileGroups: Array<{ id: string; name: string; pattern: string; filePaths: string[] }>,
   selectedFilePaths: string[], // Add this parameter
-  fileAuthorMode: 'groups' | 'individual' // Add this parameter
+  fileAuthorMode: "groups" | "individual" // Add this parameter
 ) {
   let currentTree = tree
   const steps = path.substring(tree.name.length + 1).split("/")
@@ -712,7 +706,7 @@ function createPartitionedHiearchy(
 
   // Add this new section for FILE_AUTHORS grouping
   if (groupingType === "FILE_AUTHORS") {
-    if (fileAuthorMode === 'groups') {
+    if (fileAuthorMode === "groups") {
       // Existing group logic...
       if (fileGroups.length === 0) {
         const emptyRoot: GitTreeObject = {
@@ -729,7 +723,7 @@ function createPartitionedHiearchy(
           // Single group: show aggregated authors directly as bubbles
           const group = fileGroups[0]
           const aggregatedAuthors = createAggregatedAuthorNodesForGroup(databaseInfo, group, sizeMetricType)
-          
+
           const singleGroupRoot: GitTreeObject = {
             type: "tree",
             name: `Authors in ${group.name}`,
@@ -742,9 +736,9 @@ function createPartitionedHiearchy(
           // Multiple groups: show groups as containers with aggregated authors
           if (path === "/" || path === "") {
             // Root level: show all groups as containers
-            const groupNodes: GitTreeObject[] = fileGroups.map(group => {
+            const groupNodes: GitTreeObject[] = fileGroups.map((group) => {
               const aggregatedAuthors = createAggregatedAuthorNodesForGroup(databaseInfo, group, sizeMetricType)
-              
+
               return {
                 type: "tree",
                 name: group.name,
@@ -759,17 +753,17 @@ function createPartitionedHiearchy(
               name: "File Groups Authors View",
               path: "/",
               children: groupNodes,
-              hash: hashString("multi-group-authors-" + fileGroups.map(g => g.id).join(","))
+              hash: hashString("multi-group-authors-" + fileGroups.map((g) => g.id).join(","))
             }
             castedTree = multiGroupRoot as GitObject
           } else {
             // Zoomed into a specific group
             const groupId = path.replace("/group-", "")
-            const targetGroup = fileGroups.find(g => g.id === groupId)
-            
+            const targetGroup = fileGroups.find((g) => g.id === groupId)
+
             if (targetGroup) {
               const aggregatedAuthors = createAggregatedAuthorNodesForGroup(databaseInfo, targetGroup, sizeMetricType)
-              
+
               const zoomedGroupRoot: GitTreeObject = {
                 type: "tree",
                 name: `Authors in ${targetGroup.name}`,
@@ -809,10 +803,10 @@ function createPartitionedHiearchy(
           // Single file: show authors directly
           const filePath = selectedFilePaths[0]
           const authorNodes = createAuthorNodesForFile(databaseInfo, filePath, sizeMetricType)
-          
+
           const singleFileRoot: GitTreeObject = {
             type: "tree",
-            name: `Authors of ${filePath.split('/').pop()}`,
+            name: `Authors of ${filePath.split("/").pop()}`,
             path: filePath,
             children: authorNodes,
             hash: hashString("single-file-authors-" + filePath)
@@ -820,12 +814,12 @@ function createPartitionedHiearchy(
           castedTree = singleFileRoot as GitObject
         } else {
           // Multiple files: show files as containers with their authors
-          const fileNodes: GitTreeObject[] = selectedFilePaths.map(filePath => {
+          const fileNodes: GitTreeObject[] = selectedFilePaths.map((filePath) => {
             const authorNodes = createAuthorNodesForFile(databaseInfo, filePath, sizeMetricType)
-            
+
             return {
               type: "tree",
-              name: filePath.split('/').pop() || filePath,
+              name: filePath.split("/").pop() || filePath,
               path: filePath,
               children: authorNodes,
               hash: hashString("file-authors-" + filePath)
@@ -847,7 +841,7 @@ function createPartitionedHiearchy(
     // For non-FILE_AUTHORS groupings, use the existing logic
     castedTree = currentTree as GitObject
   }
-  
+
   const hiearchy = hierarchy(castedTree)
     .sum((d) => {
       // Special handling for FILE_AUTHORS grouping
@@ -856,7 +850,7 @@ function createPartitionedHiearchy(
         // Use the pre-calculated size from createAuthorNodesForFile
         return authorBlob.sizeInBytes ?? 1
       }
-      
+
       // Default logic for other groupings
       const blob = d as GitBlobObject
       switch (sizeMetricType) {
@@ -1328,12 +1322,12 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
 
 // Helper function to create author nodes for a specific file
 function createAuthorNodesForFile(
-  databaseInfo: DatabaseInfo, 
-  filePath: string, 
+  databaseInfo: DatabaseInfo,
+  filePath: string,
   sizeMetricType: SizeMetricType
 ): GitBlobObject[] {
   const fileAuthors: Array<{ author: string; contribution: number }> = []
-  
+
   Object.entries(databaseInfo.authorsFilesStats).forEach(([author, fileStats]) => {
     if (fileStats[filePath]) {
       let contribution = 0
@@ -1355,7 +1349,7 @@ function createAuthorNodesForFile(
           contribution = fileStats[filePath].nb_line_change || 0
           break
       }
-      
+
       if (contribution > 0) {
         fileAuthors.push({ author, contribution })
       }
@@ -1370,15 +1364,19 @@ function createAuthorNodesForFile(
 
   return fileAuthors.map(({ author, contribution }, index) => {
     // For EQUAL_SIZE, all authors should have the same normalized size
-    const normalizedSize = sizeMetricType === "EQUAL_SIZE" 
-      ? 1 / fileAuthors.length  // Equal distribution
-      : totalContribution > 0 ? contribution / totalContribution : 0
+    const normalizedSize =
+      sizeMetricType === "EQUAL_SIZE"
+        ? 1 / fileAuthors.length // Equal distribution
+        : totalContribution > 0
+          ? contribution / totalContribution
+          : 0
 
     const minSize = 0.3
     const maxSize = 2.0
-    const scaledSize = sizeMetricType === "EQUAL_SIZE"
-      ? 1.0  // Fixed size for equal
-      : minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
+    const scaledSize =
+      sizeMetricType === "EQUAL_SIZE"
+        ? 1.0 // Fixed size for equal
+        : minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
 
     return {
       type: "blob",
@@ -1394,14 +1392,14 @@ function createAuthorNodesForFile(
 
 // Helper function to create aggregated author nodes for a group
 function createAggregatedAuthorNodesForGroup(
-  databaseInfo: DatabaseInfo, 
-  group: { id: string; name: string; pattern: string; filePaths: string[] }, 
+  databaseInfo: DatabaseInfo,
+  group: { id: string; name: string; pattern: string; filePaths: string[] },
   sizeMetricType: SizeMetricType
 ): GitBlobObject[] {
   const authorContributions = new Map<string, number>()
-  
+
   // Aggregate contributions across all files in the group
-  group.filePaths.forEach(filePath => {
+  group.filePaths.forEach((filePath) => {
     Object.entries(databaseInfo.authorsFilesStats).forEach(([author, fileStats]) => {
       if (fileStats[filePath]) {
         let contribution = 0
@@ -1419,7 +1417,7 @@ function createAggregatedAuthorNodesForGroup(
             contribution = fileStats[filePath].nb_line_change || 0
             break
         }
-        
+
         if (contribution > 0) {
           const currentTotal = authorContributions.get(author) || 0
           authorContributions.set(author, currentTotal + contribution)
@@ -1435,31 +1433,33 @@ function createAggregatedAuthorNodesForGroup(
 
   // Calculate total for scaling
   const totalContribution = authorArray.reduce((sum, item) => sum + item.contribution, 0)
-  
+
   // Find min and max contributions for better scaling
-  const maxContribution = Math.max(...authorArray.map(item => item.contribution))
-  const minContribution = Math.min(...authorArray.map(item => item.contribution))
-  
-  console.log(`Group ${group.name}: Total contrib: ${totalContribution}, Max: ${maxContribution}, Min: ${minContribution}`) // Debug
+  const maxContribution = Math.max(...authorArray.map((item) => item.contribution))
+  const minContribution = Math.min(...authorArray.map((item) => item.contribution))
+
+  console.log(
+    `Group ${group.name}: Total contrib: ${totalContribution}, Max: ${maxContribution}, Min: ${minContribution}`
+  ) // Debug
 
   return authorArray.map(({ author, contribution }, index) => {
     let scaledSize: number
-    
+
     if (sizeMetricType === "EQUAL_SIZE") {
       // All authors get equal size
       scaledSize = 1000
     } else {
       // Scale based on contribution relative to max in this group
       const contributionRatio = maxContribution > 0 ? contribution / maxContribution : 0
-      
+
       // Use a more aggressive scaling to make differences more visible
-      const minSize = 200   // Minimum bubble size
-      const maxSize = 3000  // Maximum bubble size
-      
+      const minSize = 200 // Minimum bubble size
+      const maxSize = 3000 // Maximum bubble size
+
       // Apply square root scaling to make differences more visible
       scaledSize = minSize + (maxSize - minSize) * Math.sqrt(contributionRatio)
     }
-    
+
     console.log(`Author ${author}: contribution=${contribution}, scaledSize=${scaledSize}`) // Debug
 
     return {
