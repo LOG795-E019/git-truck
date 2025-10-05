@@ -161,10 +161,6 @@ export function DetailsCard({
       setClickedObject(null)
       return null
     }
-    let metricString = "Nb Lines Changed"
-    if (sizeMetric === "MOST_COMMITS") {
-      metricString = "Nb Commits"
-    }
 
     return (
       <div

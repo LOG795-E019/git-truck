@@ -1,4 +1,3 @@
-import type { DatabaseInfo } from "~/routes/$repo.$"
 import { Fragment } from "react"
 import { useData } from "../contexts/DataContext"
 
