@@ -360,6 +360,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
             key={d.data.path}
             className={clsx("transition-opacity hover:opacity-60", {
               // Root element always has pointer cursor OR non-root clickable elements
+
               "cursor-pointer":
                 i === 0 ||
                 (i > 0 &&
