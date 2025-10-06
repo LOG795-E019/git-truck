@@ -5,5 +5,6 @@ import InstanceManager from "~/analyzer/InstanceManager.server"
 export const action: ActionFunction = async () => {
   await InstanceManager.closeAllDBConnections()
   await DB.clearCache()
-  return redirect("/")
+  // Add cache busting timestamp to force reload
+  return redirect(`/?t=${Date.now()}`)
 }
