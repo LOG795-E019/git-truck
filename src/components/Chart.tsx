@@ -353,65 +353,62 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
           })()}
 
         {/* Draw author nodes and other nodes */}
-        {nodes.map((d, i) => {
-          const authorName = clickedObject?.path === d.data.path ? clickedObject.name : "" // Check if the author has relationships
-          return (
-            <g
-              key={d.data.path}
-              className={clsx("transition-opacity hover:opacity-60", {
-                // Root element always has pointer cursor OR non-root clickable elements
-                "cursor-pointer":
-                  i === 0 ||
-                  (i > 0 &&
-                    !isTree(d.data) &&
-                    // Show pointer cursor for author bubbles in FILE_AUTHORS mode
-                    ((groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) ||
-                      // Show pointer cursor for blobs in other modes
-                      groupingType !== "FILE_AUTHORS")),
+        {nodes.map((d, i) => (
+          <g
+            key={d.data.path}
+            className={clsx("transition-opacity hover:opacity-60", {
+              // Root element always has pointer cursor OR non-root clickable elements
+              "cursor-pointer":
+                i === 0 ||
+                (i > 0 &&
+                  !isTree(d.data) &&
+                  // Show pointer cursor for author bubbles in FILE_AUTHORS mode
+                  ((groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) ||
+                    // Show pointer cursor for blobs in other modes
+                    groupingType !== "FILE_AUTHORS")),
 
-                // Non-root elements - prioritize zoom cursor over pointer cursor
-                "cursor-zoom-in":
-                  i > 0 &&
-                  isTree(d.data) &&
-                  // Show zoom cursor for group containers in FILE_AUTHORS mode
-                  ((groupingType === "FILE_AUTHORS" && fileGroups.length > 1 && d.data.path.startsWith("/group-")) ||
-                    // Show zoom cursor for regular tree navigation
-                    (groupingType !== "FILE_AUTHORS" && isTree(d.data))),
+              // Non-root elements - prioritize zoom cursor over pointer cursor
+              "cursor-zoom-in":
+                i > 0 &&
+                isTree(d.data) &&
+                // Show zoom cursor for group containers in FILE_AUTHORS mode
+                ((groupingType === "FILE_AUTHORS" && fileGroups.length > 1 && d.data.path.startsWith("/group-")) ||
+                  // Show zoom cursor for regular tree navigation
+                  (groupingType !== "FILE_AUTHORS" && isTree(d.data))),
 
-                "animate-blink": clickedObject?.path === d.data.path,
-                "opacity-30":
-                  clickedObject?.path != d.data.path &&
-                  !relationshipsMap[selectedAuthorName]?.Relationships?.[d.data.name] &&
-                  clickedObject != null,
-                "opacity-100":
-                  clickedObject == null ||
-                  clickedObject?.path === d.data.path ||
-                  !relationshipsMap[selectedAuthorName]?.Relationships?.[d.data.name]
-              })}
-              {...createGroupHandlers(d, i === 0)}
-              onClick={(evt) => {
-                evt.stopPropagation()
-                if (chartType === "AUTHOR_GRAPH" && d.data.path.includes("/@")) {
-                  setSelectedAuthorName(d.data.name)
-                  setClickedObject(d.data)
-                } else {
-                  createGroupHandlers(d, i === 0).onClick(evt)
-                }
-              }}
-            >
-              {(numberOfDepthLevels === undefined || d.depth <= numberOfDepthLevels) && (
-                <>
-                  <Node key={d.data.path} d={d} isSearchMatch={Boolean(searchResults[d.data.path])} />
-                  {labelsVisible && (
-                    <NodeText key={`text|${path}|${d.data.path}|${chartType}|${sizeMetric}|${now}`} d={d}>
-                      {collapseText({ d, isRoot: i === 0, path, displayText: d.data.name, chartType })}
-                    </NodeText>
-                  )}
-                </>
-              )}
-            </g>
-          )
-        })}
+              "animate-blink": clickedObject?.path === d.data.path,
+              "opacity-30":
+                clickedObject?.path != d.data.path &&
+                !relationshipsMap[selectedAuthorName]?.Relationships?.[d.data.name] &&
+                clickedObject != null,
+              "opacity-100":
+                clickedObject == null ||
+                clickedObject?.path === d.data.path ||
+                !relationshipsMap[selectedAuthorName]?.Relationships?.[d.data.name]
+            })}
+            {...createGroupHandlers(d, i === 0)}
+            onClick={(evt) => {
+              evt.stopPropagation()
+              if (chartType === "AUTHOR_GRAPH" && d.data.path.includes("/@")) {
+                setSelectedAuthorName(d.data.name)
+                setClickedObject(d.data)
+              } else {
+                createGroupHandlers(d, i === 0).onClick(evt)
+              }
+            }}
+          >
+            {(numberOfDepthLevels === undefined || d.depth <= numberOfDepthLevels) && (
+              <>
+                <Node key={d.data.path} d={d} isSearchMatch={Boolean(searchResults[d.data.path])} />
+                {labelsVisible && (
+                  <NodeText key={`text|${path}|${d.data.path}|${chartType}|${sizeMetric}|${now}`} d={d}>
+                    {collapseText({ d, isRoot: i === 0, path, displayText: d.data.name, chartType })}
+                  </NodeText>
+                )}
+              </>
+            )}
+          </g>
+        ))}
       </svg>
     </div>
   )
