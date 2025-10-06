@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { useData } from "../contexts/DataContext"
 import { useOptions } from "~/contexts/OptionsContext"
 import type { FileGroup } from "~/contexts/OptionsContext"
@@ -93,7 +93,7 @@ export function FileSelector() {
 
       allPatterns.forEach((pat) => {
         // Convert glob pattern to regex
-        let regexPattern = pat
+        const regexPattern = pat
           .replace(/\*\*/g, "__DOUBLE_STAR__")
           .replace(/\./g, "\\.")
           .replace(/\*/g, "[^/]*")
@@ -374,9 +374,18 @@ export function FileSelector() {
               return (
                 <div
                   key={filePath}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     handleFileSelect(filePath)
                     setSearchTerm("")
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      handleFileSelect(filePath)
+                      setSearchTerm("")
+                    }
                   }}
                   className={`flex cursor-pointer items-center justify-between px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 ${
                     isSelected ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" : ""
@@ -448,7 +457,20 @@ export function FileSelector() {
       )}
 
       {/* Click outside handler */}
-      {isDropdownOpen && <div className="fixed inset-0 z-0" onClick={() => setIsDropdownOpen(false)} />}
+      {isDropdownOpen && (
+        <div
+          role="button"
+          tabIndex={0}
+          className="fixed inset-0 z-0"
+          onClick={() => setIsDropdownOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setIsDropdownOpen(false)
+            }
+          }}
+          aria-label="Close dropdown"
+        />
+      )}
     </div>
   )
 }

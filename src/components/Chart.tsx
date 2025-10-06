@@ -27,7 +27,7 @@ import { usePath } from "../contexts/PathContext"
 import { getTextColorFromBackground, isBlob, isTree } from "~/util"
 import clsx from "clsx"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
-import { Grouping, GroupingType } from "~/metrics/grouping"
+import type { GroupingType } from "~/metrics/grouping"
 import { useSearch } from "~/contexts/SearchContext"
 import type { DatabaseInfo } from "~/routes/$repo.$"
 import ignore, { type Ignore } from "ignore"
@@ -62,6 +62,8 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   const { clickedObject, setClickedObject } = useClickedObject()
   const { setPath } = usePath()
   const { showFilesWithoutChanges, showFilesWithNoJSONRules } = useOptions()
+  const [, authorColors] = useMetrics()
+
   const [selectedAuthorName, setSelectedAuthorName] = useState<string>("")
   // Get relationships map
   const relationshipsMap = getAuthorsRelationships(databaseInfo)
@@ -252,11 +254,6 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                 ...Object.values(relationshipsMap).flatMap((rel) => Object.keys(rel.Relationships))
               ])
             )
-
-            // Get author colors
-            const [, authorColors] = useMetrics()
-
-            const offsetAmount = 8 // pixels
 
             return Object.entries(relationshipsMap).flatMap(([author1, relObj]) =>
               Object.entries(relObj.Relationships).flatMap(([author2, relData]) => {
@@ -506,36 +503,24 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
       }
     } else if (chartType === "AUTHOR_GRAPH") {
       const datum = d as HierarchyCircularNode<GitObject>
-
-      // Check if this is the outer container (author-network) or an individual author
-      if (d.data.name === "author-network") {
-        // Outer container: rounded rectangle filling the whole space
-        props = {
-          ...props,
-          x: 0,
-          y: 0,
-          width: size.width,
-          height: size.height,
-          rx: 20, // Rounded corners
-          ry: 20,
-          fill: "black", // Make container transparent
-          stroke: "black" // Optional border
-        }
-      } else {
-        // Individual authors: circular bubbles
-        props = {
-          ...props,
-          x: datum.x - datum.r,
-          y: datum.y - datum.r + estimatedLetterHeightForDirText - 1,
-          width: datum.r * 2,
-          height: datum.r * 2,
-          rx: datum.r,
-          ry: datum.r
-        }
+      // Individual authors: circular bubbles
+      props = {
+        ...props,
+        x: datum.x - datum.r,
+        y: datum.y - datum.r + estimatedLetterHeightForDirText - 1,
+        width: datum.r * 2,
+        height: datum.r * 2,
+        rx: datum.r,
+        ry: datum.r
       }
     }
     return props
   }, [d, metricsData, metricType, chartType, groupingType]) // Add groupingType to dependencies
+
+  // Don't render the author-network container node in AUTHOR_GRAPH
+  if (chartType === "AUTHOR_GRAPH" && d.data.name === "author-network") {
+    return null
+  }
 
   return (
     <rect
