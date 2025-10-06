@@ -40,6 +40,16 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
 
+      - name: Clear git-truck cache
+        run: |
+          if [ -d "$TMPDIR/git-truck-cache" ]; then
+            rm -rf "$TMPDIR/git-truck-cache"
+          fi
+          if [ -d "/tmp/git-truck-cache" ]; then
+            rm -rf "/tmp/git-truck-cache"
+          fi
+        shell: bash
+
       - name: Run e2e tests
         run: npm run test:e2e
 
