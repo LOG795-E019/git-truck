@@ -381,8 +381,10 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                 "animate-blink": clickedObject?.path === d.data.path,
                 "opacity-30":
                   clickedObject?.path != d.data.path &&
-                  !relationshipsMap[selectedAuthorName]?.Relationships?.[d.data.name],
+                  !relationshipsMap[selectedAuthorName]?.Relationships?.[d.data.name] &&
+                  clickedObject != null,
                 "opacity-100":
+                  clickedObject == null ||
                   clickedObject?.path === d.data.path ||
                   !relationshipsMap[selectedAuthorName]?.Relationships?.[d.data.name]
               })}
