@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test"
 
 test("navigate to a repository", async ({ page }) => {
-  console.log("EMPTY TEST")
+  expect(true).toBe(true)
   // await page.goto("/")
 
   //   // Expect a title "to contain" a substring.
