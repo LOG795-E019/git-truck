@@ -170,18 +170,6 @@ export const Options = memo(function Options() {
     MOST_CONTRIBUTIONS: mdiPlusMinusVariant
   }
 
-  const sizeMetricOptions = useMemo(() => {
-    if (groupingType === "FILE_AUTHORS") {
-      // Only return the relevant options for FILE_AUTHORS
-      return {
-        MOST_COMMITS: "Commits",
-        MOST_CONTRIBS: "Line Changes",
-        EQUAL_SIZE: "Equal"
-      } as Record<SizeMetricType, string>
-    }
-    return SizeMetric // Use all options for other groupings
-  }, [groupingType])
-
   const sizeMetricIcons = useMemo(() => {
     const allIcons: Record<SizeMetricType, string> = {
       FILE_SIZE: mdiResize,
@@ -575,9 +563,12 @@ export const Options = memo(function Options() {
                   {/* Numeric filter inputs */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex flex-col">
-                      <label className="text-xs font-medium">Commits</label>
+                      <label htmlFor="commits-min" className="text-xs font-medium">
+                        Commits
+                      </label>
                       <div className="flex items-center gap-1">
                         <input
+                          id="commits-min"
                           type="number"
                           className="input input-xs w-full"
                           placeholder="Min"
@@ -593,6 +584,7 @@ export const Options = memo(function Options() {
                         />
                         <span className="text-xs text-gray-500">to</span>
                         <input
+                          id="commits-max"
                           type="number"
                           className="input input-xs w-full"
                           placeholder="Max"
@@ -609,9 +601,12 @@ export const Options = memo(function Options() {
                       </div>
                     </div>
                     <div className="flex flex-col">
-                      <label className="text-xs font-medium">Line Changes</label>
+                      <label htmlFor="line-changes-min" className="text-xs font-medium">
+                        Line Changes
+                      </label>
                       <div className="flex items-center gap-1">
                         <input
+                          id="line-changes-min"
                           type="number"
                           className="input input-xs w-full"
                           placeholder="Min"
@@ -628,6 +623,7 @@ export const Options = memo(function Options() {
                         />
                         <span className="text-xs text-gray-500">to</span>
                         <input
+                          id="line-changes-max"
                           type="number"
                           className="input input-xs w-full"
                           placeholder="Max"
@@ -696,7 +692,6 @@ export const Options = memo(function Options() {
                         </thead>
                         <tbody>
                           {numericFilteredAuthors.map((author, index) => {
-                            const stats = databaseInfo?.authorsTotalStats[author]
                             return (
                               <tr
                                 key={author}

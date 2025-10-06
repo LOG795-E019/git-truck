@@ -1,4 +1,3 @@
-import { Fragment } from "react"
 import { useMetrics } from "~/contexts/MetricContext"
 import { LegendDot } from "./util"
 import { AuthorContributionData } from "~/components/DetailsCard"

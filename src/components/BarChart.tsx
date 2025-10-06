@@ -16,11 +16,6 @@ const BarChart = () => {
   const isCommitMetric = sizeMetric === "MOST_COMMITS"
   const chartData = isCommitMetric ? databaseInfo.commitCountPerDay : databaseInfo.lineChangeCountPerDay || [] // Add fallback to empty array
 
-  // Early return if no data is available
-  if (!chartData || chartData.length === 0) {
-    return <div ref={ref} style={{ height: 30 }} />
-  }
-
   // Filter data based on selected range
   const filteredData = chartData.filter((d) => {
     return d.timestamp >= databaseInfo.selectedRange[0] && d.timestamp <= databaseInfo.selectedRange[1]
@@ -98,8 +93,7 @@ const BarChart = () => {
           }
         }
 
-        const tooltip = d3
-          .select("body")
+        d3.select("body")
           .append("div")
           .attr("class", "tooltip")
           .style("position", "absolute")
@@ -121,6 +115,11 @@ const BarChart = () => {
         d3.select(this).attr("fill", d.count === 0 ? zeroColor : barColor)
       })
   }, [groupedData, size, showDailyBars, isCommitMetric, metricLabel])
+
+  // Conditional rendering
+  if (!chartData || chartData.length === 0) {
+    return <div ref={ref} style={{ height: 30 }} />
+  }
 
   return (
     <div className="flex justify-center" ref={ref}>

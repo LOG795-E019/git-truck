@@ -27,7 +27,7 @@ import { usePath } from "../contexts/PathContext"
 import { getTextColorFromBackground, isBlob, isTree } from "~/util"
 import clsx from "clsx"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
-import { Grouping, GroupingType } from "~/metrics/grouping"
+import type { GroupingType } from "~/metrics/grouping"
 import { useSearch } from "~/contexts/SearchContext"
 import type { DatabaseInfo } from "~/routes/$repo.$"
 import ignore, { type Ignore } from "ignore"
@@ -62,6 +62,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   const { clickedObject, setClickedObject } = useClickedObject()
   const { setPath } = usePath()
   const { showFilesWithoutChanges, showFilesWithNoJSONRules } = useOptions()
+  const [, authorColors] = useMetrics()
 
   let numberOfDepthLevels: number | undefined = undefined
   switch (depthType) {
@@ -251,11 +252,6 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                 ...Object.values(relationshipsMap).flatMap((rel) => Object.keys(rel.Relationships))
               ])
             )
-
-            // Get author colors
-            const [, authorColors] = useMetrics()
-
-            const offsetAmount = 8 // pixels
 
             return Object.entries(relationshipsMap).flatMap(([author1, relObj]) =>
               Object.entries(relObj.Relationships).flatMap(([author2, relData]) => {
