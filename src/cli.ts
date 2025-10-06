@@ -15,6 +15,7 @@ import { describeAsyncJob, getDirName, isValidURI } from "./analyzer/util.server
 import { log, setLogLevel } from "./analyzer/log.server"
 import type { NextFunction } from "express-serve-static-core"
 import InstanceManager from "./analyzer/InstanceManager.server"
+import DB from "./analyzer/DB.server"
 
 async function main() {
   const args = parseArgs()
@@ -22,6 +23,11 @@ async function main() {
     setLogLevel(args.log as string)
   }
   const options = getArgsWithDefaults()
+
+  // Clear cache if --invalidate-cache flag is passed
+  if (args["invalidate-cache"] || args["invalidateCache"]) {
+    await DB.clearCache()
+  }
 
   const currentV = pkg.version
   let updateMessage = ""
