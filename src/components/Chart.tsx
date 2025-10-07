@@ -162,7 +162,6 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
             if (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) {
               return setClickedObject(d.data)
             }
-
             // For other cases, show details
             return setClickedObject(d.data)
           },
@@ -219,6 +218,24 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   }
 
   const now = isChrome || isChromium || isEdgeChromium ? Date.now() : 0 // Necessary in chrome to update text positions
+
+  // calculate top coauthors, depending on selected author
+  const selectedAuthor = clickedObject?.name || null
+  const relationships = selectedAuthor ? Object.entries(relationshipsMap[selectedAuthor]?.Relationships || {}) : []
+
+  const searched_Stat = sizeMetric === "MOST_CONTRIBS" ? "nb_line_change" : "nb_commits"
+
+  const topCoAuthors = selectedAuthor
+    ? relationships
+        .sort((a, b) => {
+          const aTotal = (a[1].author1Contribs[searched_Stat] ?? 0) + (a[1].author2Contribs[searched_Stat] ?? 0)
+          const bTotal = (b[1].author1Contribs[searched_Stat] ?? 0) + (b[1].author2Contribs[searched_Stat] ?? 0)
+          return bTotal - aTotal
+        })
+        .slice(0, 5)
+        .map(([author2]) => author2)
+    : []
+
   return (
     <div className="relative grid place-items-center overflow-hidden" ref={ref}>
       <svg
@@ -246,7 +263,6 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
               }
             })
 
-            console.log("Related authors for", relationshipsMap)
             // Extract unique array of authors from relationshipsMap
             const authorsInRelationshipMap = Array.from(
               new Set([
@@ -301,114 +317,138 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                 const x2b = pos2.x - perpX * offsetB
                 const y2b = pos2.y - perpY * offsetB
 
+                // Opacity, show top co authors
+                const isInTop = author1 === selectedAuthor && topCoAuthors.includes(author2)
+                const lineOpacity = isInTop ? 0.9 : 0.1
+
                 // ...existing code...
-                return [
-                  <line
-                    key={`rel-${author1}-${author2}-1`}
-                    x1={x1a}
-                    y1={y1a}
-                    x2={x2a}
-                    y2={y2a}
-                    stroke={color1}
-                    strokeWidth={strokeWidth1}
-                    opacity={0.7}
-                    className="cursor-pointer transition-opacity hover:opacity-100"
-                    onMouseEnter={() => {
-                      const tooltipContent = {
-                        type: "blob", // Use existing type
-                        name: `${author1} ↔ ${author2} : ${searched_Stat}: ${totalValue}`,
-                        path: `relationship-${author1}-${author2}`,
-                        sizeInBytes: totalValue // Use existing property that tooltip reads
-                        // Add any other properties your tooltip expects
-                      }
-                      setHoveredObject(tooltipContent as any)
-                    }}
-                    onMouseLeave={() => setHoveredObject(null)}
-                  />,
-                  <line
-                    key={`rel-${author1}-${author2}-2`}
-                    x1={x1b}
-                    y1={y1b}
-                    x2={x2b}
-                    y2={y2b}
-                    stroke={color2}
-                    strokeWidth={strokeWidth2}
-                    opacity={0.7}
-                    className="cursor-pointer transition-opacity hover:opacity-100"
-                    onMouseEnter={() => {
-                      const tooltipContent = {
-                        type: "blob", // Use existing type
-                        name: `${author1} ↔ ${author2} : ${searched_Stat}: ${totalValue}`,
-                        path: `relationship-${author1}-${author2}`,
-                        sizeInBytes: totalValue // Use existing property that tooltip reads
-                        // Add any other properties your tooltip expects
-                      }
-                      setHoveredObject(tooltipContent as any)
-                    }}
-                    onMouseLeave={() => setHoveredObject(null)}
-                  />
-                ]
+                if (!selectedAuthor) {
+                  return [
+                    <line
+                      key={`rel-${author1}-${author2}-1`}
+                      x1={x1a}
+                      y1={y1a}
+                      x2={x2a}
+                      y2={y2a}
+                      stroke={color1}
+                      strokeWidth={strokeWidth1}
+                      opacity={lineOpacity}
+                      className="cursor-pointer transition-opacity hover:opacity-100"
+                      onMouseEnter={() => {
+                        const tooltipContent = {
+                          type: "blob", // Use existing type
+                          name: `${author1} ↔ ${author2} : ${searched_Stat}: ${totalValue}`,
+                          path: `relationship-${author1}-${author2}`,
+                          sizeInBytes: totalValue // Use existing property that tooltip reads
+                          // Add any other properties your tooltip expects
+                        }
+                        setHoveredObject(tooltipContent as any)
+                      }}
+                      onMouseLeave={() => setHoveredObject(null)}
+                    />,
+                    <line
+                      key={`rel-${author1}-${author2}-2`}
+                      x1={x1b}
+                      y1={y1b}
+                      x2={x2b}
+                      y2={y2b}
+                      stroke={color2}
+                      strokeWidth={strokeWidth2}
+                      opacity={lineOpacity}
+                      className="cursor-pointer transition-opacity hover:opacity-100"
+                      onMouseEnter={() => {
+                        const tooltipContent = {
+                          type: "blob", // Use existing type
+                          name: `${author1} ↔ ${author2} : ${searched_Stat}: ${totalValue}`,
+                          path: `relationship-${author1}-${author2}`,
+                          sizeInBytes: totalValue // Use existing property that tooltip reads
+                          // Add any other properties your tooltip expects
+                        }
+                        setHoveredObject(tooltipContent as any)
+                      }}
+                      onMouseLeave={() => setHoveredObject(null)}
+                    />
+                  ]
+                } else if (selectedAuthor && isInTop) {
+                  return [
+                    <line
+                      key={`rel-${author1}-${author2}-1`}
+                      x1={x1a}
+                      y1={y1a}
+                      x2={x2a}
+                      y2={y2a}
+                      stroke={color1}
+                      strokeWidth={strokeWidth1}
+                      opacity={lineOpacity}
+                      className="cursor-pointer transition-opacity hover:opacity-100"
+                      onMouseEnter={() => {
+                        const tooltipContent = {
+                          type: "blob", // Use existing type
+                          name: `${author1} ↔ ${author2} : ${searched_Stat}: ${totalValue}`,
+                          path: `relationship-${author1}-${author2}`,
+                          sizeInBytes: totalValue // Use existing property that tooltip reads
+                          // Add any other properties your tooltip expects
+                        }
+                        setHoveredObject(tooltipContent as any)
+                      }}
+                      onMouseLeave={() => setHoveredObject(null)}
+                    />
+                  ]
+                }
               })
             )
           })()}
 
         {/* Draw author nodes and other nodes */}
-        {nodes.map((d, i) => (
-          <g
-            key={d.data.path}
-            className={clsx("transition-opacity hover:opacity-60", {
-              // Root element always has pointer cursor OR non-root clickable elements
-              "cursor-pointer":
-                i === 0 ||
-                (i > 0 &&
-                  !isTree(d.data) &&
-                  // Show pointer cursor for author bubbles in FILE_AUTHORS mode
-                  ((groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) ||
-                    // Show pointer cursor for blobs in other modes
-                    groupingType !== "FILE_AUTHORS")),
+        {(() => {
+          return nodes.map((d, i) => {
+            const nodeOpacity = !selectedAuthor
+              ? "opacity-100" // all visible when no author selected
+              : selectedAuthor === d.data.name || topCoAuthors.includes(d.data.name)
+                ? "opacity-100" // top coauthors or selected author
+                : "opacity-30"
 
-              // Non-root elements - prioritize zoom cursor over pointer cursor
-              "cursor-zoom-in":
-                i > 0 &&
-                isTree(d.data) &&
-                // Show zoom cursor for group containers in FILE_AUTHORS mode
-                ((groupingType === "FILE_AUTHORS" && fileGroups.length > 1 && d.data.path.startsWith("/group-")) ||
-                  // Show zoom cursor for regular tree navigation
-                  (groupingType !== "FILE_AUTHORS" && isTree(d.data))),
+            return (
+              <g
+                key={d.data.path}
+                className={clsx("transition-opacity hover:opacity-60", nodeOpacity, {
+                  // Root element always has pointer cursor OR non-root clickable elements
+                  "cursor-pointer":
+                    i === 0 ||
+                    (i > 0 &&
+                      !isTree(d.data) &&
+                      // Show pointer cursor for author bubbles in FILE_AUTHORS mode
+                      ((groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) ||
+                        // Show pointer cursor for blobs in other modes
+                        groupingType !== "FILE_AUTHORS")),
 
-              "animate-blink": clickedObject?.path === d.data.path,
-              "opacity-30":
-                clickedObject?.path != d.data.path &&
-                !relationshipsMap[selectedAuthorName]?.Relationships?.[d.data.name] &&
-                clickedObject != null,
-              "opacity-100":
-                clickedObject == null ||
-                clickedObject?.path === d.data.path ||
-                !relationshipsMap[selectedAuthorName]?.Relationships?.[d.data.name]
-            })}
-            {...createGroupHandlers(d, i === 0)}
-            onClick={(evt) => {
-              evt.stopPropagation()
-              if (chartType === "AUTHOR_GRAPH" && d.data.path.includes("/@")) {
-                setSelectedAuthorName(d.data.name)
-                setClickedObject(d.data)
-              } else {
-                createGroupHandlers(d, i === 0).onClick(evt)
-              }
-            }}
-          >
-            {(numberOfDepthLevels === undefined || d.depth <= numberOfDepthLevels) && (
-              <>
-                <Node key={d.data.path} d={d} isSearchMatch={Boolean(searchResults[d.data.path])} />
-                {labelsVisible && (
-                  <NodeText key={`text|${path}|${d.data.path}|${chartType}|${sizeMetric}|${now}`} d={d}>
-                    {collapseText({ d, isRoot: i === 0, path, displayText: d.data.name, chartType })}
-                  </NodeText>
+                  // Non-root elements - prioritize zoom cursor over pointer cursor
+                  "cursor-zoom-in":
+                    i > 0 &&
+                    isTree(d.data) &&
+                    // Show zoom cursor for group containers in FILE_AUTHORS mode
+                    ((groupingType === "FILE_AUTHORS" && fileGroups.length > 1 && d.data.path.startsWith("/group-")) ||
+                      // Show zoom cursor for regular tree navigation
+                      (groupingType !== "FILE_AUTHORS" && isTree(d.data))),
+
+                  "animate-blink": clickedObject?.path === d.data.path
+                })}
+                {...createGroupHandlers(d, i === 0)}
+              >
+                {(numberOfDepthLevels === undefined || d.depth <= numberOfDepthLevels) && (
+                  <>
+                    <Node key={d.data.path} d={d} isSearchMatch={Boolean(searchResults[d.data.path])} />
+                    {labelsVisible && (
+                      <NodeText key={`text|${path}|${d.data.path}|${chartType}|${sizeMetric}|${now}`} d={d}>
+                        {collapseText({ d, isRoot: i === 0, path, displayText: d.data.name, chartType })}
+                      </NodeText>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-          </g>
-        ))}
+              </g>
+            )
+          })
+        })()}
       </svg>
     </div>
   )
