@@ -16,7 +16,7 @@
   "scripts": {
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "jest --testPathIgnorePatterns=integration --coverage",
-    "test:integration": "jest --testPathPattern=integration",
+    "test:integration": "jest --testPathPattern=integration --runInBand",
     "build": "remix build && npm run build-cli",
     "build-cli": "tsup --minify --treeshake --out-dir . ./src/cli.ts",
     "dev": "remix dev",
