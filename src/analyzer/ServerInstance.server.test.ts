@@ -75,8 +75,8 @@ describe("ServerInstance.gatherCommitsFromGitLog", () => {
     expect(commit?.fileChanges).toHaveLength(1)
     expect(commit?.fileChanges[0]).toEqual({
       isBinary: true,
-      insertions: 1, // Binary files get 1 insertion
-      deletions: 0, // Binary files get 0 deletions
+      insertions: 1,
+      deletions: 0,
       path: "test-repo/image.png",
       mode: "modify"
     })
@@ -94,7 +94,6 @@ describe("ServerInstance.gatherCommitsFromGitLog", () => {
 
     expect(renamedFiles.length).toBeGreaterThan(0)
     const commit = commits.get("abc123")
-    // The path has repo prefix added twice (once in analyzeRenamedFile, once in gatherCommitsFromGitLog)
     expect(commit?.fileChanges[0].path).toContain("new.ts")
   })
 
@@ -109,7 +108,6 @@ describe("ServerInstance.gatherCommitsFromGitLog", () => {
 
     await instance.gatherCommitsFromGitLog(gitLogOutput, commits, renamedFiles)
 
-    // File creation should add to renamedFiles
     const createEntry = renamedFiles.find((r) => r.toname === "newfile.ts" && r.fromname === null)
     expect(createEntry).toBeDefined()
   })
@@ -125,7 +123,6 @@ describe("ServerInstance.gatherCommitsFromGitLog", () => {
 
     await instance.gatherCommitsFromGitLog(gitLogOutput, commits, renamedFiles)
 
-    // File deletion should add to renamedFiles
     const deleteEntry = renamedFiles.find((r) => r.fromname === "oldfile.ts" && r.toname === null)
     expect(deleteEntry).toBeDefined()
   })
@@ -221,9 +218,7 @@ describe("ServerInstance.generateRenameChains", () => {
   })
 
   it("should handle simple rename A -> B", () => {
-    const orderedRenames: RenameInterval[] = [
-      { fromname: "A.ts", toname: "B.ts", timestamp: 1000, timestampend: 2000 }
-    ]
+    const orderedRenames: RenameInterval[] = [{ fromname: "A.ts", toname: "B.ts", timestamp: 1000, timestampend: 2000 }]
     const currentFiles = ["B.ts"]
 
     const result = instance["generateRenameChains"](orderedRenames, currentFiles)
@@ -252,31 +247,24 @@ describe("ServerInstance.generateRenameChains", () => {
   })
 
   it("should handle file creation (null -> A)", () => {
-    const orderedRenames: RenameInterval[] = [
-      { fromname: null, toname: "A.ts", timestamp: 1000, timestampend: 2000 }
-    ]
+    const orderedRenames: RenameInterval[] = [{ fromname: null, toname: "A.ts", timestamp: 1000, timestampend: 2000 }]
     const currentFiles = ["A.ts"]
 
     const result = instance["generateRenameChains"](orderedRenames, currentFiles)
 
     expect(result).toHaveLength(1)
     const chain = result[0]
-    // When file is created (fromname is null), it ends the chain
-    // So chain contains the initial file state with updated timestamp
     expect(chain[0].fromname).toBe("A.ts")
     expect(chain[0].toname).toBe("A.ts")
-    expect(chain[0].timestamp).toBe(2000) // Updated to the creation timestampend
+    expect(chain[0].timestamp).toBe(2000)
   })
 
   it("should handle file deletion (A -> null)", () => {
-    const orderedRenames: RenameInterval[] = [
-      { fromname: "A.ts", toname: null, timestamp: 1000, timestampend: 2000 }
-    ]
+    const orderedRenames: RenameInterval[] = [{ fromname: "A.ts", toname: null, timestamp: 1000, timestampend: 2000 }]
     const currentFiles: string[] = []
 
     const result = instance["generateRenameChains"](orderedRenames, currentFiles)
 
-    // File was deleted, so no chain in current files
     expect(result).toHaveLength(0)
   })
 

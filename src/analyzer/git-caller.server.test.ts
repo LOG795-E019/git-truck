@@ -90,7 +90,6 @@ another invalid line`
 
     const result = GitCaller.parseRefs(input)
 
-    // Should only parse valid lines
     expect(result.Branches).toEqual({ main: "abc123" })
     expect(result.Tags).toEqual({ "v1.0.0": "def456" })
   })
@@ -116,7 +115,6 @@ jkl012 refs/tags/v2.0.0`
     const result = GitCaller.parseRefs(input)
 
     const tagNames = Object.keys(result.Tags)
-    // Should be sorted in descending order (newest first)
     expect(tagNames[0]).toBe("v2.1.0")
     expect(tagNames[tagNames.length - 1]).toBe("v1.0.0")
   })
@@ -148,7 +146,6 @@ abc123 refs/tags/v1.0.0`
 
     const result = GitCaller.parseRefs(input)
 
-    // Regex should handle whitespace
     expect(result.Branches).toBeDefined()
     expect(result.Tags).toBeDefined()
   })

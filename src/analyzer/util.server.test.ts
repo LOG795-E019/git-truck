@@ -71,7 +71,7 @@ describe("analyzeRenamedFile", () => {
 
   it("should avoid double slashes in paths", () => {
     const renamedFiles: RenameEntry[] = []
-    const file = "{=>newfile.ts}" // Edge case with empty old path
+    const file = "{=>newfile.ts}"
 
     const result = analyzeRenamedFile(file, timestamp, authortime, renamedFiles, repo)
 
@@ -113,7 +113,7 @@ describe("getTimeIntervals", () => {
     intervals.forEach((interval) => {
       expect(interval).toBeInstanceOf(Array)
       expect(interval).toHaveLength(2)
-      expect(typeof interval[0]).toBe("string") // label
+      expect(typeof interval[0]).toBe("string")
       expect(typeof interval[1]).toBe("number")
     })
   })
@@ -146,7 +146,6 @@ describe("getTimeIntervals", () => {
     const intervals = getTimeIntervals("year", minTime, maxTime)
 
     expect(intervals.length).toBeGreaterThanOrEqual(4)
-    // Should include years from minTime to maxTime range
     const yearLabels = intervals.map((i) => i[0])
     expect(yearLabels).toContain("2024")
   })

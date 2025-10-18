@@ -55,7 +55,6 @@ describe("Git repository analysis integration tests", () => {
       const commitCounts = await instance.db.getCommitCountPerFile()
       expect(Object.keys(commitCounts).length).toBeGreaterThan(0)
 
-      // Verify all counts are positive integers
       Object.values(commitCounts).forEach((count) => {
         expect(count).toBeGreaterThan(0)
         expect(Number.isInteger(count)).toBe(true)
