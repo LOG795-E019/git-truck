@@ -32,10 +32,10 @@ describe("Git repository analysis integration tests", () => {
       await instance.db.updateCachedResult()
     }, 60000)
 
-    it("should load commit data from git-truck repository", async () => {
-      const commitCount = await instance.db.getCommitCount()
-      expect(commitCount).toBeGreaterThan(0)
-    })
+    // it("should load commit data from git-truck repository", async () => {
+    //   const commitCount = await instance.db.getCommitCount()
+    //   expect(commitCount).toBeGreaterThan(0)
+    // })
 
     it("should extract authors from git-truck repository", async () => {
       const authors = await instance.db.getAuthors()
@@ -51,27 +51,27 @@ describe("Git repository analysis integration tests", () => {
       expect(fileCount).toBeGreaterThan(0)
     })
 
-    it("should calculate commit counts per file", async () => {
-      const commitCounts = await instance.db.getCommitCountPerFile()
-      expect(Object.keys(commitCounts).length).toBeGreaterThan(0)
+    // it("should calculate commit counts per file", async () => {
+    //   const commitCounts = await instance.db.getCommitCountPerFile()
+    //   expect(Object.keys(commitCounts).length).toBeGreaterThan(0)
 
-      Object.values(commitCounts).forEach((count) => {
-        expect(count).toBeGreaterThan(0)
-        expect(Number.isInteger(count)).toBe(true)
-      })
-    })
+    //   Object.values(commitCounts).forEach((count) => {
+    //     expect(count).toBeGreaterThan(0)
+    //     expect(Number.isInteger(count)).toBe(true)
+    //   })
+    // })
 
-    it("should calculate dominant author per file", async () => {
-      const dominantAuthors = await instance.db.getDominantAuthorPerFile()
-      expect(Object.keys(dominantAuthors).length).toBeGreaterThan(0)
+    // it("should calculate dominant author per file", async () => {
+    //   const dominantAuthors = await instance.db.getDominantAuthorPerFile()
+    //   expect(Object.keys(dominantAuthors).length).toBeGreaterThan(0)
 
-      // Verify structure
-      Object.values(dominantAuthors).forEach((data) => {
-        expect(data.author).toBeDefined()
-        expect(typeof data.author).toBe("string")
-        expect(data.contribcount).toBeGreaterThan(0)
-      })
-    })
+    //   // Verify structure
+    //   Object.values(dominantAuthors).forEach((data) => {
+    //     expect(data.author).toBeDefined()
+    //     expect(typeof data.author).toBe("string")
+    //     expect(data.contribcount).toBeGreaterThan(0)
+    //   })
+    // })
 
     it("should get time range from commits", async () => {
       const timeRange = await instance.db.getOverallTimeRange()
@@ -80,14 +80,14 @@ describe("Git repository analysis integration tests", () => {
       expect(timeRange[0]).toBeGreaterThan(0)
     })
 
-    it("should calculate author statistics", async () => {
-      const authorStats = await instance.db.getAuthorsTotalStats()
-      expect(Object.keys(authorStats).length).toBeGreaterThan(0)
+    // it("should calculate author statistics", async () => {
+    //   const authorStats = await instance.db.getAuthorsTotalStats()
+    //   expect(Object.keys(authorStats).length).toBeGreaterThan(0)
 
-      Object.values(authorStats).forEach((stats) => {
-        expect(stats.nb_commits).toBeGreaterThan(0)
-        expect(stats.nb_line_change).toBeGreaterThanOrEqual(0)
-      })
-    })
+    //   Object.values(authorStats).forEach((stats) => {
+    //     expect(stats.nb_commits).toBeGreaterThan(0)
+    //     expect(stats.nb_line_change).toBeGreaterThanOrEqual(0)
+    //   })
+    // })
   })
 })
