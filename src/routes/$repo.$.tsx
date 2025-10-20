@@ -12,6 +12,7 @@ import { DetailsCard } from "~/components/DetailsCard"
 import { GlobalInfo } from "~/components/GlobalInfo"
 import { HiddenFiles } from "~/components/HiddenFiles"
 import { Legend } from "~/components/legend/Legend"
+import { MetricsCard } from "~/components/MetricsCard"
 import { Options } from "~/components/Options"
 import { Providers } from "~/components/Providers"
 import { SearchCard } from "~/components/SearchCard"
@@ -438,6 +439,7 @@ export default function Repo() {
                     <GlobalInfo />
                     <Options />
                     <Legend hoveredObject={hoveredObject} showUnionAuthorsModal={showUnionAuthorsModal} />
+                    <MetricsCard />
                   </>
                 ) : null}
                 {!isFullscreen ? (
