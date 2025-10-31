@@ -27,7 +27,8 @@ import {
   mdiTextBox,
   mdiAccountMultiple,
   mdiFilter,
-  mdiFileMultiple
+  mdiFileMultiple,
+  mdiChartBox
 } from "@mdi/js"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
@@ -188,8 +189,17 @@ export const Options = memo(function Options() {
       } as Record<SizeMetricType, string>
     }
 
+    if (chartType === "HEAT_MAP") {
+      // For heat map, only show relevant metrics
+      return {
+        MOST_COMMITS: allIcons.MOST_COMMITS,
+        MOST_CONTRIBS: allIcons.MOST_CONTRIBS,
+        FILE_SIZE: allIcons.FILE_SIZE
+      } as Record<SizeMetricType, string>
+    }
+
     return allIcons
-  }, [groupingType])
+  }, [groupingType, chartType])
 
   const groupingTypeIcons: Record<GroupingType, string> = {
     FILE_TYPE: mdiFileCodeOutline,
@@ -202,7 +212,8 @@ export const Options = memo(function Options() {
   const chartTypeIcons: Record<ChartType, string> = {
     BUBBLE_CHART: mdiChartBubble,
     TREE_MAP: mdiChartTree,
-    AUTHOR_GRAPH: mdiAccountNetwork
+    AUTHOR_GRAPH: mdiAccountNetwork,
+    HEAT_MAP: mdiChartBox
   }
 
   // Buttons Behaviors
@@ -296,6 +307,12 @@ export const Options = memo(function Options() {
                 ? (Object.fromEntries(
                     Object.entries(SizeMetric).filter(([key]) => key !== "FILE_SIZE" && key !== "LAST_CHANGED")
                   ) as Record<SizeMetricType, string>)
+                : chartType === "HEAT_MAP"
+                ? {
+                    MOST_COMMITS: SizeMetric.MOST_COMMITS,
+                    MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
+                    FILE_SIZE: "Files changed"
+                  } as Record<SizeMetricType, string>
                 : SizeMetric
             }
             defaultValue={sizeMetric}

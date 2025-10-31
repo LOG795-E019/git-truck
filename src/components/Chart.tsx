@@ -35,6 +35,7 @@ import { cn, usePrefersLightMode } from "~/styling"
 import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
 import { createHash } from "crypto"
 import fileTypeRulesJSON from "./fileTypeRules.json"
+import HeatMap from "./HeatMap"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -64,6 +65,9 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   const { showFilesWithoutChanges, showFilesWithNoJSONRules } = useOptions()
   const [, authorColors] = useMetrics()
 
+  // Handle HEAT_MAP separately to avoid unnecessary computations
+  const isHeatMap = chartType === "HEAT_MAP"
+
   let numberOfDepthLevels: number | undefined = undefined
   switch (depthType) {
     case "One":
@@ -87,6 +91,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   }
 
   const filetree = useMemo(() => {
+    if (isHeatMap) return databaseInfo.fileTree
     // TODO: make filtering faster, e.g. by not having to refetch everything every time
     const ig = ignore()
     ig.add(databaseInfo.hiddenFiles)
@@ -97,6 +102,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       children: flatten(filtered)
     } as GitTreeObject
   }, [
+    isHeatMap,
     databaseInfo.fileTree,
     hierarchyType,
     databaseInfo.hiddenFiles,
@@ -105,6 +111,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   ])
 
   const nodes = useMemo(() => {
+    if (isHeatMap) return []
     console.time("nodes")
     if (size.width === 0 || size.height === 0) return []
     const res = createPartitionedHiearchy(
@@ -215,6 +222,16 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   }
 
   const now = isChrome || isChromium || isEdgeChromium ? Date.now() : 0 // Necessary in chrome to update text positions
+
+  // Render heat map if selected
+  if (isHeatMap) {
+    return (
+      <div className="relative grid h-full place-items-center overflow-hidden !transition-none" ref={ref}>
+        <HeatMap filetree={filetree} sizeMetric={sizeMetric} />
+      </div>
+    )
+  }
+
   return (
     <div className="relative grid place-items-center overflow-hidden" ref={ref}>
       <svg

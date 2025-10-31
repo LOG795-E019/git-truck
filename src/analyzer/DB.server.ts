@@ -744,18 +744,18 @@ export default class DB {
   public async getLineChangePerTime(timerange: [number, number]) {
     const [query, timeUnit] = this.getTimeStringFormat(timerange)
     const res = await this.query(`
-      SELECT strftime(date, '${query}') as timestring, 
-            SUM(insertions + deletions) AS total_changes, 
-            MIN(committertime) AS ct 
+      SELECT strftime(date, '${query}') as timestring,
+            SUM(insertions + deletions) AS total_changes,
+            MIN(committertime) AS ct
       FROM (
-        SELECT date_trunc('${timeUnit}', to_timestamp(fc.committertime)) AS date, 
+        SELECT date_trunc('${timeUnit}', to_timestamp(fc.committertime)) AS date,
               fc.committertime,
               fc.insertions,
               fc.deletions
         FROM filechanges_commits_renamed_cached fc
         WHERE fc.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
-      ) 
-      GROUP BY date 
+      )
+      GROUP BY date
       ORDER BY date ASC;
     `)
 
@@ -782,6 +782,39 @@ export default class DB {
 
     const sorted = final.sort((a, b) => a.timestamp - b.timestamp)
     return sorted
+  }
+
+  public async getHeatMapData(timerange: [number, number]) {
+    // Use weekly granularity for cleaner heatmap
+    const res = await this.query(`
+      SELECT
+        strftime(date, '%Y Week %W') as week,
+        MIN(committertime) AS timestamp,
+        COUNT(DISTINCT commithash) AS commits,
+        SUM(insertions + deletions) AS line_changes,
+        COUNT(DISTINCT filepath) AS file_changes
+      FROM (
+        SELECT
+          date_trunc('week', to_timestamp(committertime)) AS date,
+          committertime,
+          commithash,
+          filepath,
+          insertions,
+          deletions
+        FROM filechanges_commits_renamed_cached
+        WHERE committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+      ) fc
+      GROUP BY date
+      ORDER BY date ASC;
+    `)
+
+    return res.map((row) => ({
+      date: row["week"] as string,
+      timestamp: Number(row["timestamp"]),
+      commits: Number(row["commits"]),
+      lineChanges: Number(row["line_changes"]),
+      fileChanges: Number(row["file_changes"])
+    }))
   }
 
   public async updateColorSeed(seed: string) {
