@@ -27,7 +27,9 @@ import {
   mdiTextBox,
   mdiAccountMultiple,
   mdiFilter,
-  mdiFileMultiple
+  mdiFileMultiple,
+  mdiAccount,
+  mdiAccountSupervisorCircle
 } from "@mdi/js"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
@@ -196,7 +198,9 @@ export const Options = memo(function Options() {
     FOLDER_NAME: mdiFolder,
     JSON_RULES: mdiTextBox,
     AUTHOR_FILES: mdiAccountMultiple,
-    FILE_AUTHORS: mdiAccountNetwork
+    FILE_AUTHORS: mdiAccountNetwork,
+    DEFAULT:mdiAccount,
+    SUPERVISOR:mdiAccountSupervisorCircle,
   }
 
   const chartTypeIcons: Record<ChartType, string> = {
@@ -326,14 +330,20 @@ export const Options = memo(function Options() {
             />
           </fieldset>
         )}
-        {chartType !== "AUTHOR_GRAPH" && (
+        {
           <fieldset className="rounded-lg border p-2">
             <legend className="card__title ml-1.5 justify-start gap-2">
               <Icon path={mdiGroup} size="1.25em" />
               Grouping
             </legend>
             <EnumSelect
-              enum={Grouping}
+              enum={
+                chartType === "AUTHOR_GRAPH"
+                ? (Object.fromEntries(
+                    Object.entries(Grouping).filter(([key]) => key == "DEFAULT" || key == "SUPERVISOR")
+                  ) as Record<GroupingType, string>)
+                : Grouping 
+              }
               defaultValue={groupingType}
               onChange={(newGroupingType: GroupingType) => {
                 setGroupingType(newGroupingType)
@@ -353,7 +363,7 @@ export const Options = memo(function Options() {
               iconMap={groupingTypeIcons}
             />
           </fieldset>
-        )}
+        }
 
         {/* Global Reset Button */}
         {chartType === "AUTHOR_GRAPH" && (
