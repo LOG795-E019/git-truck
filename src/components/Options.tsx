@@ -209,6 +209,24 @@ export const Options = memo(function Options() {
     AUTHOR_GRAPH: mdiAccountNetwork
   }
 
+  // Compute grouping options depending on chart type. When not in AUTHOR_GRAPH,
+  // exclude DEFAULT and SUPERVISOR. Use strict equality checks.
+  const groupingOptions = useMemo(() => {
+    if (chartType === "AUTHOR_GRAPH") {
+      return (
+        Object.fromEntries(
+          Object.entries(Grouping).filter(([key]) => key === "DEFAULT" || key === "SUPERVISOR")
+        ) as Record<GroupingType, string>
+      )
+    }
+
+    return (
+      Object.fromEntries(
+        Object.entries(Grouping).filter(([key]) => key !== "DEFAULT" && key !== "SUPERVISOR")
+      ) as Record<GroupingType, string>
+    )
+  }, [chartType])
+
   // Buttons Behaviors
   const toggleAuthor = (author: string) => {
     if (selectedAuthors.includes(author)) {
@@ -337,13 +355,7 @@ export const Options = memo(function Options() {
               Grouping
             </legend>
             <EnumSelect
-              enum={
-                chartType === "AUTHOR_GRAPH"
-                ? (Object.fromEntries(
-                    Object.entries(Grouping).filter(([key]) => key == "DEFAULT" || key == "SUPERVISOR")
-                  ) as Record<GroupingType, string>)
-                : Grouping 
-              }
+              enum={groupingOptions}
               defaultValue={groupingType}
               onChange={(newGroupingType: GroupingType) => {
                 setGroupingType(newGroupingType)
