@@ -788,6 +788,7 @@ export default class DB {
     // Use weekly granularity for cleaner heatmap
     const res = await this.query(`
       SELECT
+        author,
         strftime(date, '%Y Week %W') as week,
         MIN(committertime) AS timestamp,
         COUNT(DISTINCT commithash) AS commits,
@@ -800,21 +801,41 @@ export default class DB {
           commithash,
           filepath,
           insertions,
-          deletions
+          deletions,
+          author
         FROM filechanges_commits_renamed_cached
         WHERE committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
       ) fc
-      GROUP BY date
+      GROUP BY date, author
       ORDER BY date ASC;
     `)
 
-    return res.map((row) => ({
+    const data = res.map((row) => ({
+      author: row["author"] as string,
       date: row["week"] as string,
       timestamp: Number(row["timestamp"]),
       commits: Number(row["commits"]),
       lineChanges: Number(row["line_changes"]),
       fileChanges: Number(row["file_changes"])
     }))
+
+    const oneWeek = 7 * 24 * 60 * 60
+    const weeks: string[] = []
+    for (let t = timerange[0]; t <= timerange[1]; t += oneWeek) {
+      const date = new Date(t * 1000)
+      const label = `${date.getFullYear()} Week ${String(this.getWeekNumber(date)).padStart(2, "0")}`
+      weeks.push(label)
+    }
+
+    return { data: data, weeks: weeks }
+  }
+
+  public getWeekNumber(date: Date): number {
+    const temp = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+    const dayNum = temp.getUTCDay() || 7
+    temp.setUTCDate(temp.getUTCDate() + 4 - dayNum)
+    const yearStart = new Date(Date.UTC(temp.getUTCFullYear(), 0, 1))
+    return Math.ceil(((temp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
   }
 
   public async updateColorSeed(seed: string) {
