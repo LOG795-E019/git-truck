@@ -77,6 +77,10 @@ const HeatMap = ({ filetree, sizeMetric }: HeatMapProps) => {
     }
   }
 
+  // Get metric label for display
+  const metricLabel =
+    sizeMetric === "MOST_COMMITS" ? "Commits" : sizeMetric === "MOST_CONTRIBS" ? "Line changes" : "File changes"
+
   useEffect(() => {
     const params = new URLSearchParams({
       repo: repo.name,
@@ -214,10 +218,6 @@ const HeatMap = ({ filetree, sizeMetric }: HeatMapProps) => {
       .attr("height", height)
       .attr("viewBox", `0 0 ${width} ${height}`)
       .attr("preserveAspectRatio", "xMidYMid meet")
-
-    // Get metric label for display
-    const metricLabel =
-      sizeMetric === "MOST_COMMITS" ? "Commits" : sizeMetric === "MOST_CONTRIBS" ? "Line changes" : "File changes"
 
     // Get all non-zero values for percentile calculation
     const nonZeroValues = filteredHeatMapData
@@ -544,7 +544,7 @@ const HeatMap = ({ filetree, sizeMetric }: HeatMapProps) => {
         {/* Top contributors & top weeks */}
         {selectedAuthor === "ALL" && contributorRanks.length > 0 && (
           <div className="mt-4">
-            <h3 className="mb-2 font-semibold text-gray-700">Top Contributors</h3>
+            <h3 className="mb-2 font-semibold text-gray-700">Top Contributors - {metricLabel}</h3>
             <div className="space-y-3">
               {contributorRanks.slice(0, 3).map((c, index) => (
                 <div key={c.author} className="rounded-lg border border-gray-200 bg-gray-50 p-3 shadow-sm">
