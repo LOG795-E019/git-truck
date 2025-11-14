@@ -38,6 +38,20 @@ import fileTypeRulesJSON from "./fileTypeRules.json"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
+export type RelationshipMap = Record<
+    string,
+    {
+      Relationships: Record<
+        string,
+        {
+          commonFiles: string[]
+          author1Contribs: { nb_commits: number; nb_line_change: number }
+          author2Contribs: { nb_commits: number; nb_line_change: number }
+        }
+      >
+    }
+  >;
+
 export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObject: (obj: GitObject | null) => void }) {
   const [ref, rawSize] = useComponentSize()
   const { searchResults } = useSearch()
@@ -1306,19 +1320,7 @@ function createAuthorNetworkHierarchy(
 }
 
 export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
-  const relationshipMap: Record<
-    string,
-    {
-      Relationships: Record<
-        string,
-        {
-          commonFiles: string[]
-          author1Contribs: { nb_commits: number; nb_line_change: number }
-          author2Contribs: { nb_commits: number; nb_line_change: number }
-        }
-      >
-    }
-  > = {}
+  const relationshipMap: RelationshipMap = {}
 
   const authorsFileStats = databaseInfo.authorsFilesStats
   const authors = Object.keys(authorsFileStats)
@@ -1373,6 +1375,43 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
   }
 
   return relationshipMap
+}
+
+interface Edge {
+  source: string,
+  target: string,
+  weight: number
+}
+
+function createAuthorGroups(relationshipMap: RelationshipMap, weightMetric: string){
+  // We get the list of author names that have relationships.
+  const node_data = Object.keys(relationshipMap); 
+
+  // We get the list of edges and their weight, while keeping a hashmap to avoid duplicates.
+  const existingEdges: Map<string, boolean> = new Map<string, boolean>();
+  const edge_data: Edge[] = new Array() as Array<Edge>;
+  // We iterate over every node.
+  for(const node in node_data){
+    // For every node, we iterate over it's relationships in the relationshipMap.
+    for(const [key, value] of Object.entries(relationshipMap[node])){
+      // We check if the Edge already exists between these nodes in the hashmap. 
+      // If not, create it.
+      if(!existingEdges.has(node + ";" + key)){
+        // --Calculate weight here--
+
+        
+        edge_data.push({
+          source: node,
+          target: key,
+          weight: 10, // INSERT CALCULATED WEIGHT HERE
+        });
+        // Add new pair to existing Edges.
+        existingEdges.set(node + ";" + key, true);
+      }
+    }
+  }
+
+  // --Code for grouping using library here--
 }
 
 // Helper function to create author nodes for a specific file
