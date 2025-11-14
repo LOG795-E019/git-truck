@@ -784,19 +784,18 @@ export default class DB {
     return sorted
   }
 
-  public async getHeatMapData(timerange: [number, number]) {
-    // Use weekly granularity for cleaner heatmap
+  public async getActivityData(timerange: [number, number]) {
     const res = await this.query(`
       SELECT
         author,
-        strftime(date, '%Y Week %W') as week,
+        strftime(date, '%Y-%m-%d') as day,
         MIN(committertime) AS timestamp,
         COUNT(DISTINCT commithash) AS commits,
         SUM(insertions + deletions) AS line_changes,
         COUNT(DISTINCT filepath) AS file_changes
       FROM (
         SELECT
-          date_trunc('week', to_timestamp(committertime)) AS date,
+          date_trunc('day', to_timestamp(committertime)) AS date,
           committertime,
           commithash,
           filepath,
@@ -812,22 +811,91 @@ export default class DB {
 
     const data = res.map((row) => ({
       author: row["author"] as string,
-      date: row["week"] as string,
+      date: row["day"] as string,
       timestamp: Number(row["timestamp"]),
       commits: Number(row["commits"]),
       lineChanges: Number(row["line_changes"]),
       fileChanges: Number(row["file_changes"])
     }))
 
-    const oneWeek = 7 * 24 * 60 * 60
-    const weeks: string[] = []
-    for (let t = timerange[0]; t <= timerange[1]; t += oneWeek) {
+    const oneDay = 24 * 60 * 60
+    const days: string[] = []
+    for (let t = timerange[0]; t <= timerange[1]; t += oneDay) {
       const date = new Date(t * 1000)
-      const label = `${date.getFullYear()} Week ${String(this.getWeekNumber(date)).padStart(2, "0")}`
-      weeks.push(label)
+      const label = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+      days.push(label)
     }
 
-    return { data: data, weeks: weeks }
+    return { data: data, days: days }
+  }
+
+  public async getHeatmapData(timerange: [number, number], metric: string) {
+    const allAuthorsRes = await this.query(`
+      SELECT DISTINCT author
+      FROM filechanges_commits_renamed_cached
+      WHERE committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+      ORDER BY author;
+    `)
+
+    const authors = allAuthorsRes.map((row) => row["author"] as string)
+
+    const res = await this.query(`
+      SELECT
+        a1.author as author1,
+        a2.author as author2,
+        COUNT(DISTINCT a1.filepath) as shared_files,
+        SUM(a1.insertions + a1.deletions + a2.insertions + a2.deletions) as total_line_changes,
+        COUNT(DISTINCT a1.commithash) + COUNT(DISTINCT a2.commithash) as total_commits
+      FROM filechanges_commits_renamed_cached a1
+      JOIN filechanges_commits_renamed_cached a2
+        ON a1.filepath = a2.filepath
+        AND a1.author < a2.author
+      WHERE a1.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+        AND a2.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+      GROUP BY a1.author, a2.author
+      ORDER BY a1.author, a2.author;
+    `)
+
+    const collaborations = res.map((row) => ({
+      author1: row["author1"] as string,
+      author2: row["author2"] as string,
+      sharedFiles: Number(row["shared_files"]),
+      totalLineChanges: Number(row["total_line_changes"]),
+      totalCommits: Number(row["total_commits"])
+    }))
+
+    const matrix: number[][] = Array(authors.length)
+      .fill(0)
+      .map(() => Array(authors.length).fill(0))
+
+    collaborations.forEach((c) => {
+      const i = authors.indexOf(c.author1)
+      const j = authors.indexOf(c.author2)
+
+      let value = 0
+      switch (metric) {
+        case "MOST_COMMITS":
+          value = c.totalCommits
+          break
+        case "MOST_CONTRIBS":
+          value = c.totalLineChanges
+          break
+        case "FILE_SIZE":
+          value = c.sharedFiles
+          break
+        default:
+          value = c.sharedFiles
+      }
+
+      matrix[i][j] = value
+      matrix[j][i] = value
+    })
+
+    for (let i = 0; i < authors.length; i++) {
+      matrix[i][i] = 0
+    }
+
+    return { authors, matrix }
   }
 
   public getWeekNumber(date: Date): number {

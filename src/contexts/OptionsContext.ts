@@ -10,7 +10,8 @@ export const Chart = {
   BUBBLE_CHART: "Bubble Chart",
   TREE_MAP: "Tree Map",
   AUTHOR_GRAPH: "Author Graph",
-  HEAT_MAP: "Heat Map"
+  ACTIVITY: "Activity",
+  HEAT_MAP: "Heatmap"
 } as const
 
 export type ChartType = keyof typeof Chart

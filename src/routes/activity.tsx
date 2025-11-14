@@ -9,7 +9,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const repo = url.searchParams.get("repo")
   const startTime = url.searchParams.get("startTime")
   const endTime = url.searchParams.get("endTime")
-  const metric = url.searchParams.get("metric") || "FILE_SIZE"
 
   invariant(branch, "branch is required")
   invariant(repo, "repo is required")
@@ -18,11 +17,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const instance = InstanceManager.getInstance(repo, branch)
   if (!instance) {
-    return json({ authors: [], matrix: [] })
+    return json([])
   }
 
   const timerange: [number, number] = [parseInt(startTime), parseInt(endTime)]
-  const heatmapData = await instance.db.getHeatmapData(timerange, metric)
+  const activityData = await instance.db.getActivityData(timerange)
 
-  return json(heatmapData)
+  return json(activityData)
 }

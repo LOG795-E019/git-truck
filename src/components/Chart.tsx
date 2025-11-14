@@ -35,7 +35,8 @@ import { cn, usePrefersLightMode } from "~/styling"
 import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
 import { createHash } from "crypto"
 import fileTypeRulesJSON from "./fileTypeRules.json"
-import HeatMap from "./HeatMap"
+import Activity from "./Activity"
+import Heatmap from "./Heatmap"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -65,8 +66,9 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   const { showFilesWithoutChanges, showFilesWithNoJSONRules } = useOptions()
   const [, authorColors] = useMetrics()
 
-  // Handle HEAT_MAP separately to avoid unnecessary computations
-  const isHeatMap = chartType === "HEAT_MAP"
+  // Handle ACTIVITY and HEAT_MAP separately to avoid unnecessary computations
+  const isActivity = chartType === "ACTIVITY"
+  const isHeatmap = chartType === "HEAT_MAP"
 
   let numberOfDepthLevels: number | undefined = undefined
   switch (depthType) {
@@ -91,7 +93,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   }
 
   const filetree = useMemo(() => {
-    if (isHeatMap) return databaseInfo.fileTree
+    if (isActivity || isHeatmap) return databaseInfo.fileTree
     // TODO: make filtering faster, e.g. by not having to refetch everything every time
     const ig = ignore()
     ig.add(databaseInfo.hiddenFiles)
@@ -102,7 +104,8 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       children: flatten(filtered)
     } as GitTreeObject
   }, [
-    isHeatMap,
+    isActivity,
+    isHeatmap,
     databaseInfo.fileTree,
     hierarchyType,
     databaseInfo.hiddenFiles,
@@ -111,7 +114,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   ])
 
   const nodes = useMemo(() => {
-    if (isHeatMap) return []
+    if (isActivity || isHeatmap) return []
     console.time("nodes")
     if (size.width === 0 || size.height === 0) return []
     const res = createPartitionedHiearchy(
@@ -223,11 +226,20 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
 
   const now = isChrome || isChromium || isEdgeChromium ? Date.now() : 0 // Necessary in chrome to update text positions
 
-  // Render heat map if selected
-  if (isHeatMap) {
+  // Render activity if selected
+  if (isActivity) {
     return (
       <div className="relative grid h-full place-items-center overflow-hidden !transition-none" ref={ref}>
-        <HeatMap filetree={filetree} sizeMetric={sizeMetric} />
+        <Activity filetree={filetree} sizeMetric={sizeMetric} />
+      </div>
+    )
+  }
+
+  // Render heatmap if selected
+  if (isHeatmap) {
+    return (
+      <div className="relative grid h-full place-items-center overflow-hidden !transition-none" ref={ref}>
+        <Heatmap filetree={filetree} sizeMetric={sizeMetric} />
       </div>
     )
   }

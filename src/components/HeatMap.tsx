@@ -6,35 +6,24 @@ import type { GitTreeObject } from "~/analyzer/model"
 import { useFetcher } from "@remix-run/react"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 
-type HeatMapFetcherData = {
-  data: HeatMapDataPoint[]
-  weeks: string[]
+type HeatmapFetcherData = {
+  authors: string[]
+  matrix: number[][]
 }
 
-type HeatMapDataPoint = {
-  author: string
-  date: string
-  timestamp: number
-  commits: number
-  lineChanges: number
-  fileChanges: number
-}
-
-type HeatMapData = HeatMapDataPoint[]
-
-interface HeatMapProps {
+interface HeatmapProps {
   filetree: GitTreeObject
   sizeMetric: SizeMetricType
 }
 
-const HeatMap = ({ filetree, sizeMetric }: HeatMapProps) => {
+const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
   const svgRef = useRef<SVGSVGElement>(null)
   const { databaseInfo, repo } = useData()
   const [ref, rawSize] = useComponentSize()
   const size = useDeferredValue(rawSize)
-  const fetcher = useFetcher<HeatMapFetcherData>()
+  const fetcher = useFetcher<HeatmapFetcherData>()
   const [visible, setVisible] = useState(false)
-  // Immediately disable animations on mount
+
   useEffect(() => {
     const style = document.createElement("style")
     style.id = "heatmap-no-animation"
@@ -55,520 +44,147 @@ const HeatMap = ({ filetree, sizeMetric }: HeatMapProps) => {
     }
   }, [])
 
-  const [heatMapData, setHeatMapData] = useState<HeatMapData>([])
-  const [allWeeks, setAllWeeks] = useState<string[]>([])
-
-  const [selectedAuthor, setSelectedAuthor] = useState("ALL")
-  const [hideEmpty, setHideEmpty] = useState(false)
-
-  const authors = Array.from(new Set(heatMapData.map((d) => d.author))).sort()
-  console.log("AUTHORS:", authors)
-
-  const getMetricValue = (d: HeatMapDataPoint): number => {
-    switch (sizeMetric) {
-      case "MOST_COMMITS":
-        return d.commits
-      case "MOST_CONTRIBS":
-        return d.lineChanges
-      case "FILE_SIZE":
-        return d.fileChanges
-      default:
-        return d.commits
-    }
-  }
-
-  // Get metric label for display
-  const metricLabel =
-    sizeMetric === "MOST_COMMITS" ? "Commits" : sizeMetric === "MOST_CONTRIBS" ? "Line changes" : "File changes"
+  const [authors, setAuthors] = useState<string[]>([])
+  const [matrix, setMatrix] = useState<number[][]>([])
 
   useEffect(() => {
+    console.log("Heatmap data")
     const params = new URLSearchParams({
       repo: repo.name,
       branch: databaseInfo.branch,
       startTime: databaseInfo.selectedRange[0].toString(),
-      endTime: databaseInfo.selectedRange[1].toString()
+      endTime: databaseInfo.selectedRange[1].toString(),
+      metric: sizeMetric
     })
     fetcher.load(`/heatmap?${params}`)
-  }, [databaseInfo.selectedRange, repo.name, databaseInfo.branch])
+  }, [databaseInfo.selectedRange, repo.name, databaseInfo.branch, sizeMetric])
 
-  // set heatmap data (including empty weeks)
   useEffect(() => {
     if (fetcher.data) {
-      setHeatMapData(fetcher.data.data)
-      setAllWeeks(fetcher.data.weeks)
+      setAuthors(fetcher.data.authors)
+      setMatrix(fetcher.data.matrix)
     }
   }, [fetcher.data])
 
-  const filteredHeatMapData = allWeeks
-    .map((week) => {
-      const entries = heatMapData.filter((d) =>
-        selectedAuthor === "ALL" ? d.date === week : d.date === week && d.author === selectedAuthor
-      )
-
-      if (entries.length === 0) {
-        if (hideEmpty) return null
-        return {
-          author: selectedAuthor === "ALL" ? "" : selectedAuthor,
-          date: week,
-          timestamp: 0,
-          commits: 0,
-          lineChanges: 0,
-          fileChanges: 0
-        }
-      }
-
-      if (selectedAuthor === "ALL") {
-        // sum metrics across all authors for this week
-        return {
-          author: "",
-          date: week,
-          timestamp: Math.min(...entries.map((d) => d.timestamp)),
-          commits: d3.sum(entries, (d) => d.commits),
-          lineChanges: d3.sum(entries, (d) => d.lineChanges),
-          fileChanges: d3.sum(entries, (d) => d.fileChanges)
-        }
-      } else {
-        // only one author, take the first entry (or zero if none)
-        return entries[0]
-      }
-    })
-    .filter(Boolean) as HeatMapData
-
-  interface ContributorRank {
-    author: string
-    total: number
-    weeks: ContributorWeekData[]
-  }
-
-  // top contributor and weeks
-  interface ContributorWeekData {
-    week: string
-    value: number
-  }
-
-  let contributorRanks: ContributorRank[] = []
-
-  if (selectedAuthor === "ALL") {
-    // Group data by author
-    const authorGroups = d3.group(heatMapData, (d) => d.author)
-
-    contributorRanks = Array.from(authorGroups, ([author, entries]) => {
-      // Total metric per author
-      const total = d3.sum(entries, getMetricValue)
-
-      // Top weeks for this author
-      const weeks = entries.map((d) => ({ week: d.date, value: getMetricValue(d) })).sort((a, b) => b.value - a.value)
-
-      return { author, total, weeks }
-    })
-
-    // Sort contributors by total descending
-    contributorRanks.sort((a, b) => b.total - a.total)
-  }
-
   useEffect(() => {
-    if (!svgRef.current || filteredHeatMapData.length === 0 || size.width === 0 || size.height === 0) return
+    if (!svgRef.current || !visible || authors.length === 0 || matrix.length === 0) {
+      return
+    }
 
+    console.log("Heatmap: Starting D3 render...")
     const svgElement = svgRef.current
-
-    d3.transition.prototype.duration = function () {
-      return this
-    }
-
-    let element: Element | null = svgElement
-    while (element) {
-      if (element instanceof HTMLElement || element instanceof SVGElement) {
-        element.style.transition = "none"
-        element.style.animation = "none"
-      }
-      element = element.parentElement
-    }
-
-    const svg = d3.select(svgRef.current)
-
+    const svg = d3.select(svgElement)
     svg.selectAll("*").remove()
 
     const parentElement = svgElement.parentElement
     const parentRect = parentElement?.getBoundingClientRect()
+    const svgWidth = parentRect?.width || 800
+    const svgHeight = parentRect?.height || 600
 
-    const width = parentRect?.width || 800
-    const height = parentRect?.height || 600
+    const margin = { top: 120, right: 20, bottom: 20, left: 120 }
+    const width = svgWidth - margin.left - margin.right
+    const height = svgHeight - margin.top - margin.bottom
 
-    console.log("Parent dimensions:", width, height, "ParentRect:", parentRect)
+    const cellSize = Math.min(width / authors.length, height / authors.length)
+    const matrixWidth = cellSize * authors.length
+    const matrixHeight = cellSize * authors.length
 
-    const gridSize = Math.ceil(Math.sqrt(filteredHeatMapData.length))
-
-    const cellSize = 35
-    const cellPadding = 4
-
-    // Calculate grid dimensions
-    const gridWidth = gridSize * (cellSize + cellPadding) - cellPadding
-    const gridHeight = gridSize * (cellSize + cellPadding) - cellPadding
-
-    console.log("Grid size:", gridSize, "Grid dimensions:", gridWidth, gridHeight)
-
-    const topPadding = 120
-    const xOffset = (width - gridWidth) / 2
-    const yOffset = topPadding
-
-    console.log("Offsets:", xOffset, yOffset)
+    const xOffset = margin.left + (width - matrixWidth) / 2
+    const yOffset = margin.top + (height - matrixHeight) / 2
 
     svg
-      .attr("width", width)
-      .attr("height", height)
-      .attr("viewBox", `0 0 ${width} ${height}`)
+      .attr("width", svgWidth)
+      .attr("height", svgHeight)
+      .attr("viewBox", `0 0 ${svgWidth} ${svgHeight}`)
       .attr("preserveAspectRatio", "xMidYMid meet")
 
-    // Get all non-zero values for percentile calculation
-    const nonZeroValues = filteredHeatMapData
-      .map(getMetricValue)
-      .filter((v) => v > 0)
-      .sort((a, b) => a - b)
-
-    // Calculate percentiles for better color distribution
-    const minValue = nonZeroValues.length > 0 ? d3.min(nonZeroValues) || 0 : 0
-    const p25 = nonZeroValues.length > 0 ? d3.quantile(nonZeroValues, 0.25) || 0 : 0
-    const p50 = nonZeroValues.length > 0 ? d3.quantile(nonZeroValues, 0.5) || 0 : 0
-    const p75 = nonZeroValues.length > 0 ? d3.quantile(nonZeroValues, 0.75) || 0 : 0
-    const p90 = nonZeroValues.length > 0 ? d3.quantile(nonZeroValues, 0.9) || 0 : 0
-    const maxValue = nonZeroValues.length > 0 ? d3.max(nonZeroValues) || 1 : 1
-
-    const colorScale = d3
-      .scaleThreshold<number, string>()
-      .domain([p25, p50, p75, p90])
-      .range(["#fff7bc", "#fec44f", "#fe9929", "#d73027", "#a50026"])
-
-    console.log("Applying transform:", `translate(${xOffset},${yOffset})`)
     const g = svg
       .append("g")
-      .attr("class", "heatmap-grid")
       .attr("transform", `translate(${xOffset},${yOffset})`)
-      .style("opacity", 1)
-      .style("transition", "none !important")
-      .style("animation", "none !important")
 
-    console.log("Group transform:", g.attr("transform"))
+    const maxValue = d3.max(matrix.flatMap(row => row)) || 1
 
-    // X-axis
-    svg
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", yOffset + gridHeight + 40)
-      .attr("text-anchor", "middle")
-      .style("font-size", "13px")
-      .style("font-weight", "500")
-      .style("fill", "#333")
-      .style("transition", "none")
-      .style("animation", "none")
-      .style("opacity", 1)
-      .text("")
+    const colorScale = d3
+      .scaleSequential()
+      .domain([0, Math.sqrt(maxValue)])
+      .interpolator(d3.interpolateReds)
 
-    // Y-axis label
-    const gridCenterY = yOffset + gridHeight / 2
-    svg
-      .append("text")
-      .attr("x", -gridCenterY)
-      .attr("y", xOffset - 40)
-      .attr("text-anchor", "middle")
-      .attr("transform", `rotate(-90, ${xOffset - 40}, ${gridCenterY})`)
-      .style("font-size", "13px")
-      .style("font-weight", "500")
-      .style("fill", "#333")
-      .style("transition", "none")
-      .style("animation", "none")
-      .style("opacity", 1)
-      .text("")
+    matrix.forEach((row, i) => {
+      row.forEach((value, j) => {
+        g.append("rect")
+          .attr("x", j * cellSize)
+          .attr("y", i * cellSize)
+          .attr("width", cellSize)
+          .attr("height", cellSize)
+          .attr("fill", value === 0 ? "#f5f5f5" : colorScale(Math.sqrt(value)))
+          .attr("stroke", "#fff")
+          .attr("stroke-width", 1)
+          .style("cursor", "pointer")
+          .on("mouseover", function () {
+            d3.select(this).attr("stroke", "#000").attr("stroke-width", 2)
+          })
+          .on("mouseout", function () {
+            d3.select(this).attr("stroke", "#fff").attr("stroke-width", 1)
+          })
+          .append("title")
+          .text(`${authors[i]} ↔ ${authors[j]}: ${value}`)
+      })
+    })
 
-    g.selectAll("rect")
-      .data(filteredHeatMapData)
+    g.selectAll(".author-label-y")
+      .data(authors)
       .enter()
-      .append("rect")
-      .attr("x", (_d, i) => (i % gridSize) * (cellSize + cellPadding))
-      .attr("y", (_d, i) => Math.floor(i / gridSize) * (cellSize + cellPadding))
-      .attr("width", cellSize)
-      .attr("height", cellSize)
-      .attr("fill", (d) => {
-        const value = getMetricValue(d)
-        return value === 0 ? "#ffffff" : colorScale(value)
-      })
-      .attr("stroke-width", 1)
-      .attr("rx", 2)
-      .attr("shape-rendering", "crispEdges")
-      .attr("opacity", 1)
-      .style("cursor", "pointer")
-      .style("transition", "none")
-      .style("animation", "none")
-      .on("mouseover", function (event, d) {
-        d3.select(this).attr("stroke", "#000").attr("stroke-width", 2)
-
-        d3.select("body")
-          .append("div")
-          .attr("class", "heatmap-tooltip")
-          .style("position", "absolute")
-          .style("background", "rgba(0, 0, 0, 0.9)")
-          .style("color", "white")
-          .style("padding", "8px 12px")
-          .style("border-radius", "4px")
-          .style("font-size", "12px")
-          .style("pointer-events", "none")
-          .style("z-index", "10000")
-          .html(`<strong>${d.date}</strong><br/>${getMetricValue(d)} ${metricLabel}`)
-          .style("left", event.pageX + 10 + "px")
-          .style("top", event.pageY - 10 + "px")
-      })
-      .on("mouseout", function () {
-        d3.select(this).attr("stroke", "#fff").attr("stroke-width", 1)
-        d3.selectAll(".heatmap-tooltip").remove()
-      })
-
-    svg
       .append("text")
-      .attr("x", width / 2)
-      .attr("y", 30)
-      .attr("text-anchor", "middle")
-      .style("font-size", "18px")
-      .style("font-weight", "bold")
-      .style("transition", "none")
-      .style("animation", "none")
-      .style("opacity", 1)
-      .text(`${metricLabel} Activity Heat Map`)
-
-    svg
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", 50)
-      .attr("text-anchor", "middle")
+      .attr("class", "author-label-y")
+      .attr("x", -5)
+      .attr("y", (d, i) => i * cellSize + cellSize / 2)
+      .attr("text-anchor", "end")
+      .attr("dominant-baseline", "middle")
       .style("font-size", "12px")
-      .style("fill", "#666")
-      .style("transition", "none")
-      .style("animation", "none")
-      .style("opacity", 1)
-      .text(`${filteredHeatMapData.length} weeks of activity`)
+      .style("fill", "#333")
+      .text(d => d)
 
-    // Add gradient legend bar at bottom
-    const legendWidth = 300
-    const legendHeight = 15
-    const legendX = width / 2 - legendWidth / 2
-    const legendY = height - 40
-
-    // Create gradient definition
-    const defs = svg.append("defs")
-    const gradient = defs
-      .append("linearGradient")
-      .attr("id", "heatmap-gradient")
-      .attr("x1", "0%")
-      .attr("y1", "0%")
-      .attr("x2", "100%")
-      .attr("y2", "0%")
-
-    gradient.append("stop").attr("offset", "0%").attr("stop-color", "#fff7bc")
-    gradient.append("stop").attr("offset", "25%").attr("stop-color", "#fec44f")
-    gradient.append("stop").attr("offset", "50%").attr("stop-color", "#fe9929")
-    gradient.append("stop").attr("offset", "75%").attr("stop-color", "#d73027")
-    gradient.append("stop").attr("offset", "100%").attr("stop-color", "#a50026")
-
-    // Draw legend bar
-    svg
-      .append("rect")
-      .attr("x", legendX)
-      .attr("y", legendY)
-      .attr("width", legendWidth)
-      .attr("height", legendHeight)
-      .style("fill", "url(#heatmap-gradient)")
-      .attr("stroke", "#999")
-      .attr("stroke-width", 1)
-
-    // Add legend labels with percentile markers
-    svg
+    g.selectAll(".author-label-x")
+      .data(authors)
+      .enter()
       .append("text")
-      .attr("x", legendX - 5)
-      .attr("y", legendY + legendHeight / 2)
-      .attr("text-anchor", "end")
-      .attr("dominant-baseline", "middle")
-      .style("font-size", "11px")
-      .style("fill", "#666")
-      .text("Low")
-
-    svg
-      .append("text")
-      .attr("x", legendX + legendWidth + 5)
-      .attr("y", legendY + legendHeight / 2)
+      .attr("class", "author-label-x")
+      .attr("x", (d, i) => i * cellSize + cellSize / 2)
+      .attr("y", -10)
       .attr("text-anchor", "start")
-      .attr("dominant-baseline", "middle")
-      .style("font-size", "11px")
-      .style("fill", "#666")
-      .text("High")
+      .attr("transform", (d, i) => `rotate(-45, ${i * cellSize + cellSize / 2}, -10)`)
+      .style("font-size", "12px")
+      .style("fill", "#333")
+      .text(d => d)
 
-    // Add percentile markers below the legend
-    svg
-      .append("text")
-      .attr("x", legendX)
-      .attr("y", legendY + legendHeight + 15)
-      .attr("text-anchor", "start")
-      .attr("dominant-baseline", "middle")
-      .style("font-size", "9px")
-      .style("fill", "#999")
-      .text(`Min: ${Math.round(minValue)}`)
-
-    svg
-      .append("text")
-      .attr("x", legendX + legendWidth / 5)
-      .attr("y", legendY + legendHeight + 15)
-      .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "middle")
-      .style("font-size", "9px")
-      .style("fill", "#999")
-      .text(`25th: ${Math.round(p25)}`)
-
-    svg
-      .append("text")
-      .attr("x", legendX + (2 * legendWidth) / 5)
-      .attr("y", legendY + legendHeight + 15)
-      .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "middle")
-      .style("font-size", "9px")
-      .style("fill", "#999")
-      .text(`50th: ${Math.round(p50)}`)
-
-    svg
-      .append("text")
-      .attr("x", legendX + (3 * legendWidth) / 5)
-      .attr("y", legendY + legendHeight + 15)
-      .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "middle")
-      .style("font-size", "9px")
-      .style("fill", "#999")
-      .text(`75th: ${Math.round(p75)}`)
-
-    svg
-      .append("text")
-      .attr("x", legendX + (4 * legendWidth) / 5)
-      .attr("y", legendY + legendHeight + 15)
-      .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "middle")
-      .style("font-size", "9px")
-      .style("fill", "#999")
-      .text(`90th: ${Math.round(p90)}`)
-
-    svg
-      .append("text")
-      .attr("x", legendX + legendWidth)
-      .attr("y", legendY + legendHeight + 15)
-      .attr("text-anchor", "end")
-      .attr("dominant-baseline", "middle")
-      .style("font-size", "9px")
-      .style("fill", "#999")
-      .text(`Max: ${Math.round(maxValue)}`)
-
-    // Update SVG size to fill container
-    svg
-      .attr("width", "100%")
-      .attr("height", "100%")
-      .attr("viewBox", `0 0 ${width} ${height}`)
-      .attr("preserveAspectRatio", "xMidYMid meet")
-      .style("transition", "none")
-      .style("animation", "none")
-  }, [filteredHeatMapData, size, sizeMetric])
+  }, [authors, matrix, size, visible])
 
   if (fetcher.state === "loading") {
     return (
-      <div ref={ref} className="flex h-full items-center justify-center">
-        <p>Loading heat map data...</p>
+      <div className="flex h-full items-center justify-center">
+        <p className="text-gray-500">Loading heatmap data...</p>
       </div>
     )
   }
 
-  if (filteredHeatMapData.length === 0) {
+  if (authors.length === 0) {
     return (
-      <div ref={ref} className="flex h-full items-center justify-center">
-        <p>No data available for heat map</p>
+      <div className="flex h-full items-center justify-center">
+        <p className="text-gray-500">No collaboration data available for heatmap view</p>
       </div>
     )
   }
 
   return (
-    <div
-      ref={ref}
-      className="heatmap-container flex h-full w-full gap-4 overflow-hidden p-4"
-      style={{ opacity: visible ? 1 : 0 }}
-    >
-      <div className="flex w-40 flex-col space-y-2">
-        {/* hide emtpy checkbox */}
-        <label className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            checked={hideEmpty}
-            onChange={(e) => setHideEmpty(e.target.checked)}
-            className="form-checkbox"
-          />
-          <span>Hide empty weeks</span>
-        </label>
-
-        {/* Select for author */}
-        {authors.length > 0 && (
-          <label className="flex flex-col space-y-1">
-            <span className="text-sm font-medium">Select author</span>
-            <select value={selectedAuthor} onChange={(e) => setSelectedAuthor(e.target.value)} className="form-select">
-              <option value="ALL">All</option>
-              {authors.map((author) => (
-                <option key={author} value={author}>
-                  {author}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-      </div>
-
-      {/* heatmap */}
-      <div className="flex-1">
-        <svg ref={svgRef} className="h-full w-full" style={{ maxHeight: "100vh", display: "block" }}></svg>
-      </div>
-
-      {/* info box */}
-      <div className="flex-shrink-0 rounded-lg border bg-gray-50 px-4 py-2 text-sm shadow-sm">
-        <p>
-          <strong>Total weeks:</strong> {filteredHeatMapData.length}
-        </p>
-        <p>
-          <strong>Total commits:</strong> {d3.sum(filteredHeatMapData, (d) => d.commits)}
-        </p>
-        <p>
-          <strong>Total line changes:</strong> {d3.sum(filteredHeatMapData, (d) => d.lineChanges)}
-        </p>
-        <p>
-          <strong>Total file changes:</strong> {d3.sum(filteredHeatMapData, (d) => d.fileChanges)}
-        </p>
-
-        {/* show top contributors and their top weeks */}
-        {/* Top contributors & top weeks */}
-        {selectedAuthor === "ALL" && contributorRanks.length > 0 && (
-          <div className="mt-4">
-            <h3 className="mb-2 font-semibold text-gray-700">Top Contributors - {metricLabel}</h3>
-            <div className="space-y-3">
-              {contributorRanks.slice(0, 3).map((c, index) => (
-                <div key={c.author} className="rounded-lg border border-gray-200 bg-gray-50 p-3 shadow-sm">
-                  <div className="mb-2">
-                    <span className="font-medium text-gray-800">
-                      {index + 1}. {c.author}
-                    </span>
-                    <div className="text-sm text-gray-600">Total: {c.total}</div>
-                  </div>
-                  <ul className="ml-4 list-inside list-disc space-y-1">
-                    {c.weeks.slice(0, 3).map((w, i) => (
-                      <li key={i} className="text-gray-700">
-                        {w.week}: <span className="font-medium">{w.value}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+    <div ref={ref} className="heatmap-container relative h-full w-full overflow-auto">
+      <svg
+        ref={svgRef}
+        width={size.width || 800}
+        height={size.height || 600}
+        className="min-h-full min-w-full"
+      />
     </div>
   )
 }
 
-export default HeatMap
+export default Heatmap

@@ -20,9 +20,12 @@ export function Legend({
   showUnionAuthorsModal: () => void
   className?: string
 }) {
-  const { metricType } = useOptions()
+  const { metricType, chartType } = useOptions()
   const [metricsData] = useMetrics()
   const deferredHoveredObject = useDeferredValue(hoveredObject)
+
+  // Hide legend for Activity and Heatmap chart types
+  if (chartType === "ACTIVITY" || chartType === "HEAT_MAP") return null
 
   const metricCache = metricsData.get(metricType) ?? undefined
 

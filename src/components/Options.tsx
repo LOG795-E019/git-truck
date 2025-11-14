@@ -28,7 +28,8 @@ import {
   mdiAccountMultiple,
   mdiFilter,
   mdiFileMultiple,
-  mdiChartBox
+  mdiChartBox,
+  mdiGrid
 } from "@mdi/js"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
@@ -189,8 +190,17 @@ export const Options = memo(function Options() {
       } as Record<SizeMetricType, string>
     }
 
+    if (chartType === "ACTIVITY") {
+      // For activity, only show relevant metrics
+      return {
+        MOST_COMMITS: allIcons.MOST_COMMITS,
+        MOST_CONTRIBS: allIcons.MOST_CONTRIBS,
+        FILE_SIZE: allIcons.FILE_SIZE
+      } as Record<SizeMetricType, string>
+    }
+
     if (chartType === "HEAT_MAP") {
-      // For heat map, only show relevant metrics
+      // For heatmap, only show relevant metrics
       return {
         MOST_COMMITS: allIcons.MOST_COMMITS,
         MOST_CONTRIBS: allIcons.MOST_CONTRIBS,
@@ -213,7 +223,8 @@ export const Options = memo(function Options() {
     BUBBLE_CHART: mdiChartBubble,
     TREE_MAP: mdiChartTree,
     AUTHOR_GRAPH: mdiAccountNetwork,
-    HEAT_MAP: mdiChartBox
+    ACTIVITY: mdiChartBox,
+    HEAT_MAP: mdiGrid
   }
 
   // Buttons Behaviors
@@ -307,11 +318,17 @@ export const Options = memo(function Options() {
                 ? (Object.fromEntries(
                     Object.entries(SizeMetric).filter(([key]) => key !== "FILE_SIZE" && key !== "LAST_CHANGED")
                   ) as Record<SizeMetricType, string>)
-                : chartType === "HEAT_MAP"
+                : chartType === "ACTIVITY"
                 ? {
                     MOST_COMMITS: SizeMetric.MOST_COMMITS,
                     MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
                     FILE_SIZE: "Files changed"
+                  } as Record<SizeMetricType, string>
+                : chartType === "HEAT_MAP"
+                ? {
+                    MOST_COMMITS: SizeMetric.MOST_COMMITS,
+                    MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
+                    FILE_SIZE: "Shared files"
                   } as Record<SizeMetricType, string>
                 : SizeMetric
             }
@@ -320,7 +337,7 @@ export const Options = memo(function Options() {
             iconMap={sizeMetricIcons}
           />
         </fieldset>
-        {chartType !== "AUTHOR_GRAPH" && groupingType !== "FILE_AUTHORS" && (
+        {chartType !== "AUTHOR_GRAPH" && chartType !== "ACTIVITY" && chartType !== "HEAT_MAP" && groupingType !== "FILE_AUTHORS" && (
           <fieldset className="rounded-lg border p-2">
             <legend className="card__title ml-1.5 justify-start gap-2">
               <Icon path={mdiPalette} size="1.25em" />
@@ -343,7 +360,7 @@ export const Options = memo(function Options() {
             />
           </fieldset>
         )}
-        {chartType !== "AUTHOR_GRAPH" && (
+        {chartType !== "AUTHOR_GRAPH" && chartType !== "ACTIVITY" && chartType !== "HEAT_MAP" && (
           <fieldset className="rounded-lg border p-2">
             <legend className="card__title ml-1.5 justify-start gap-2">
               <Icon path={mdiGroup} size="1.25em" />
