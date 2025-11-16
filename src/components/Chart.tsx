@@ -5,6 +5,7 @@ import { useDeferredValue, memo, useEffect, useMemo, useState } from "react"
 import type { GitBlobObject, GitObject, GitTreeObject } from "~/analyzer/model"
 import { useClickedObject } from "~/contexts/ClickedContext"
 import { useComponentSize } from "~/hooks"
+
 import {
   bubblePadding,
   estimatedLetterHeightForDirText,
@@ -35,6 +36,7 @@ import { cn, usePrefersLightMode } from "~/styling"
 import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
 import { createHash } from "crypto"
 import fileTypeRulesJSON from "./fileTypeRules.json"
+//import * as jLouvains from "../utils/jLouvain.js"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -1258,8 +1260,7 @@ function createAuthorFileHierarchy(
 function createAuthorNetworkHierarchy(
   databaseInfo: DatabaseInfo,
   tree: GitTreeObject,
-  sizeMetricType: string,
-  groupingType: string,
+  sizeMetricType: SizeMetricType,
   minBubbleSize: number,
   maxBubbleSize: number,
   selectedAuthors: string[]
@@ -1282,7 +1283,7 @@ function createAuthorNetworkHierarchy(
   console.log("Relationships Map:", relationshipsMap)
   const uniqueRelationshipsList = {};
 
-  const groups = getAuthorGroups(relationshipsMap, groupingType);
+  const groups = getAuthorGroups(relationshipsMap, sizeMetricType);
 
   const authorNodes: GitBlobObject[] = authorEntries.map(([author, stats], index) => {
     let value: number
@@ -1406,7 +1407,7 @@ interface Edge {
   weight: number
 }
 
-function getAuthorGroups(relationshipMap: RelationshipMap, groupingType: string){
+function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeMetricType){
   // We get the list of author names that have relationships.
   const node_data = Object.keys(relationshipMap); 
 
@@ -1426,25 +1427,30 @@ function getAuthorGroups(relationshipMap: RelationshipMap, groupingType: string)
         edge_data.push({
           source: node,
           target: key,
-          weight: getRelationshipWeight(value, groupingType), // INSERT CALCULATED WEIGHT HERE
+          weight: getRelationshipWeight(value, sizeMetricType), // INSERT CALCULATED WEIGHT HERE
         });
         // Add new pair to existing Edges.
         existingEdges.set(node + ";" + key, true);
       }
     }
-  }
+  })
 
   // --Code for grouping using library here--
+  console.log("nodeData: ", node_data);
+  console.log("edge: ", edge_data);
 }
 
-function getRelationshipWeight(relationship: Relationship, groupingType: string){
-  switch(groupingType){
-    // By default use the line change weight metric.
-    default:
-      const totalValue = relationship.author1Contribs.nb_line_change + relationship.author2Contribs.nb_line_change;
-      // We want the weight to be higher the closer they are in line change contributions. Return 0 if totalValue is 0 somehow.
-      if(totalValue == 0) return 0;
+function getRelationshipWeight(relationship: Relationship, sizeMetricType: SizeMetricType){
+  let totalValue = 0;
+  switch (sizeMetricType) {
+    case "MOST_COMMITS":
+      totalValue = relationship.author1Contribs.nb_commits + relationship.author2Contribs.nb_commits;
+      return 1 - Math.abs( ( relationship.author1Contribs.nb_commits - relationship.author2Contribs.nb_commits ) / totalValue );
+    case "MOST_CONTRIBS":
+      totalValue = relationship.author1Contribs.nb_line_change + relationship.author2Contribs.nb_line_change;
       return 1 - Math.abs( ( relationship.author1Contribs.nb_line_change - relationship.author2Contribs.nb_line_change ) / totalValue );
+    default:
+      return 0;
   }
 }
 
