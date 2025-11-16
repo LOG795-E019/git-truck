@@ -38,6 +38,23 @@ import fileTypeRulesJSON from "./fileTypeRules.json"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
+type Relationship = 
+{
+  commonFiles: string[]
+  author1Contribs: { nb_commits: number; nb_line_change: number }
+  author2Contribs: { nb_commits: number; nb_line_change: number }
+}
+
+type RelationshipMap = Record<
+  string,
+  {
+    Relationships: Record<
+      string,
+      Relationship
+    >
+  }
+>;
+
 export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObject: (obj: GitObject | null) => void }) {
   const [ref, rawSize] = useComponentSize()
   const { searchResults } = useSearch()
@@ -188,7 +205,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
 
               // Special handling for FILE_AUTHORS grouping
               if (groupingType === "FILE_AUTHORS" && fileGroups.length > 1) {
-                setSelectedAuthor(null)
+                setSelectedAuthorName("")
                 // Clicking a group container zooms into that group
                 if (isTree(d.data) && d.data.path.startsWith("/group-")) {
                   console.log("FILE_AUTHORS: Zooming into group:", d.data.path)
@@ -959,6 +976,7 @@ function createPartitionedHiearchy(
       databaseInfo,
       currentTree,
       sizeMetricType,
+      groupingType,
       minBubbleSize,
       maxBubbleSize,
       selectedAuthors
@@ -1240,6 +1258,7 @@ function createAuthorNetworkHierarchy(
   databaseInfo: DatabaseInfo,
   tree: GitTreeObject,
   sizeMetricType: string,
+  groupingType: string,
   minBubbleSize: number,
   maxBubbleSize: number,
   selectedAuthors: string[]
@@ -1262,13 +1281,8 @@ function createAuthorNetworkHierarchy(
   console.log("Relationships Map:", relationshipsMap)
   const uniqueRelationshipsList = {};
 
-  Object.entries(relationshipsMap).flatMap(([author1, relObj]) =>
-              Object.entries(relObj.Relationships).flatMap(([author2, relData]) => {
-               //
-              })
-            );
+  const groups = getAuthorGroups(relationshipsMap, groupingType);
 
-  // Create author nodes with sizes based on selected metric
   const authorNodes: GitBlobObject[] = authorEntries.map(([author, stats], index) => {
     let value: number
     switch (sizeMetricType) {
@@ -1316,20 +1330,7 @@ function createAuthorNetworkHierarchy(
 }
 
 export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
-  const relationshipMap: Record<
-    string,
-    {
-      Relationships: Record<
-        string,
-        {
-          commonFiles: string[]
-          author1Contribs: { nb_commits: number; nb_line_change: number }
-          author2Contribs: { nb_commits: number; nb_line_change: number }
-          cohesions: { commits: number; line_change: number }
-        }
-      >
-    }
-  > = {}
+  const relationshipMap: RelationshipMap = {}
 
   const authorsFileStats = databaseInfo.authorsFilesStats
   const authors = Object.keys(authorsFileStats)
@@ -1398,7 +1399,53 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
   return relationshipMap
 }
 
+interface Edge {
+  source: string,
+  target: string,
+  weight: number
+}
 
+function getAuthorGroups(relationshipMap: RelationshipMap, groupingType: string){
+  // We get the list of author names that have relationships.
+  const node_data = Object.keys(relationshipMap); 
+
+  // We get the list of edges and their weight, while keeping a hashmap to avoid duplicates.
+  const existingEdges: Map<string, boolean> = new Map<string, boolean>();
+  const edge_data: Edge[] = new Array() as Array<Edge>;
+  // We iterate over every node.
+  node_data.forEach((node) => {
+    // For every node, we iterate over it's relationships in the relationshipMap.
+    for(const [key, value] of Object.entries(relationshipMap[node].Relationships)){
+      // We check if the Edge already exists between these nodes in the hashmap. 
+      // If not, create it.
+      if(!existingEdges.has(node + ";" + key)){
+        // --Calculate weight here--
+
+        
+        edge_data.push({
+          source: node,
+          target: key,
+          weight: getRelationshipWeight(value, groupingType), // INSERT CALCULATED WEIGHT HERE
+        });
+        // Add new pair to existing Edges.
+        existingEdges.set(node + ";" + key, true);
+      }
+    }
+  }
+
+  // --Code for grouping using library here--
+}
+
+function getRelationshipWeight(relationship: Relationship, groupingType: string){
+  switch(groupingType){
+    // By default use the line change weight metric.
+    default:
+      const totalValue = relationship.author1Contribs.nb_line_change + relationship.author2Contribs.nb_line_change;
+      // We want the weight to be higher the closer they are in line change contributions. Return 0 if totalValue is 0 somehow.
+      if(totalValue == 0) return 0;
+      return 1 - Math.abs( ( relationship.author1Contribs.nb_line_change - relationship.author2Contribs.nb_line_change ) / totalValue );
+  }
+}
 
 // Helper function to create author nodes for a specific file
 function createAuthorNodesForFile(
