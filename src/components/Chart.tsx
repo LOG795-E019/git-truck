@@ -36,7 +36,7 @@ import { cn, usePrefersLightMode } from "~/styling"
 import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
 import { createHash } from "crypto"
 import fileTypeRulesJSON from "./fileTypeRules.json"
-//import * as jLouvains from "../utils/jLouvain.js"
+import jLouvain from "~/utils/jLouvainWrapper"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -519,9 +519,12 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
     let fillColor: string
 
     if (chartType === "AUTHOR_GRAPH" && d.data.path.includes("/@")) {
-      // For author graph, use the authorColor property
+      // For author graph, prefer community color if present, otherwise per-author color
       const authorName = d.data.name
-      fillColor = authorColors.get(authorName) || "#cccccc"
+      // Some author nodes may include a precomputed communityColor property
+      //TODO: SELECT COMMUNITY COLOR ONLY IF GROUPING SUPERVISOR IS SELECTED
+      const communityColor = (d.data as any).communityColor as string | undefined
+      fillColor = communityColor ?? authorColors.get(authorName) ?? "#cccccc"
     } else if (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) {
       // For file authors view, use author colors
       const authorName = d.data.name
@@ -979,7 +982,6 @@ function createPartitionedHiearchy(
       databaseInfo,
       currentTree,
       sizeMetricType,
-      groupingType,
       minBubbleSize,
       maxBubbleSize,
       selectedAuthors
@@ -1280,10 +1282,25 @@ function createAuthorNetworkHierarchy(
 
   // Get relationships map
   const relationshipsMap = getAuthorsRelationships(databaseInfo)
-  console.log("Relationships Map:", relationshipsMap)
-  const uniqueRelationshipsList = {};
+  // Build community partition and community color mapping
+  const partition = getAuthorGroups(relationshipsMap, sizeMetricType)
+  const communityIds = Array.from(new Set(Object.values(partition)))
+  function hashCode(str: string) {
+    let h = 0
+    for (let i = 0; i < str.length; i++) {
+      h = (Math.imul(31, h) + str.charCodeAt(i)) | 0
+    }
+    return Math.abs(h)
+  }
 
-  const groups = getAuthorGroups(relationshipsMap, sizeMetricType);
+  function colorForCommunity(id: string) {
+    const n = Number(id)
+    const hue = Number.isFinite(n) && !Number.isNaN(n) ? (n * 137.508) % 360 : hashCode(id) % 360
+    return `hsl(${hue} 70% 50%)`
+  }
+
+  const communityColorMap = new Map<string, string>()
+  communityIds.forEach((id) => communityColorMap.set(id, colorForCommunity(String(id))))
 
   const authorNodes: GitBlobObject[] = authorEntries.map(([author, stats], index) => {
     let value: number
@@ -1306,6 +1323,9 @@ function createAuthorNetworkHierarchy(
     const scaledSize = minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
 
     
+    const communityId = partition[author] ?? "0"
+    const communityColor = communityColorMap.get(communityId)
+
     return {
       type: "blob",
       name: author,
@@ -1316,7 +1336,9 @@ function createAuthorNetworkHierarchy(
       nb_line_change: stats.nb_line_change ?? 0,
       sizeInBytes: scaledSize * fixedAuthorSize,
       size: scaledSize * fixedAuthorSize,
-      relationships: relationshipsMap[author]?.Relationships ?? {} // <-- Add relationships here
+      relationships: relationshipsMap[author]?.Relationships ?? {}, // <-- Add relationships here
+      communityId,
+      communityColor
     }
   })
 
@@ -1413,24 +1435,27 @@ function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeM
 
   // We get the list of edges and their weight, while keeping a hashmap to avoid duplicates.
   const existingEdges: Map<string, boolean> = new Map<string, boolean>();
-  const edge_data: Edge[] = new Array() as Array<Edge>;
+  const edge_data: Edge[] = [] as Edge[];
   // We iterate over every node.
   node_data.forEach((node) => {
     // For every node, we iterate over it's relationships in the relationshipMap.
     for(const [key, value] of Object.entries(relationshipMap[node].Relationships)){
       // We check if the Edge already exists between these nodes in the hashmap. 
       // If not, create it.
-      if(!existingEdges.has(node + ";" + key)){
+      if(!existingEdges.has(node + ";" + key) && !existingEdges.has(key + ";" + node)){
         // --Calculate weight here--
 
-        
-        edge_data.push({
-          source: node,
-          target: key,
-          weight: getRelationshipWeight(value, sizeMetricType), // INSERT CALCULATED WEIGHT HERE
-        });
-        // Add new pair to existing Edges.
-        existingEdges.set(node + ";" + key, true);
+        //The if was for testing
+        //if(Math.floor(Math.random()*3) % 3 == 0){
+          edge_data.push({
+            source: node,
+            target: key,
+            weight: getRelationshipWeight(value, sizeMetricType),
+          });
+          // Add new pair to existing Edges.
+          existingEdges.set(node + ";" + key, true);
+        //}
+
       }
     }
   })
@@ -1438,6 +1463,16 @@ function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeM
   // --Code for grouping using library here--
   console.log("nodeData: ", node_data);
   console.log("edge: ", edge_data);
+  // Use the typed wrapper around the bundled jLouvain implementation
+  try {
+    const community = jLouvain().nodes(node_data).edges(edge_data)
+    const partition = community()
+    console.log("jLouvain partition:", partition)
+    return partition
+  } catch (err) {
+    console.error("jLouvain error:", err)
+    return {}
+  }
 }
 
 function getRelationshipWeight(relationship: Relationship, sizeMetricType: SizeMetricType){
@@ -1445,10 +1480,10 @@ function getRelationshipWeight(relationship: Relationship, sizeMetricType: SizeM
   switch (sizeMetricType) {
     case "MOST_COMMITS":
       totalValue = relationship.author1Contribs.nb_commits + relationship.author2Contribs.nb_commits;
-      return 1 - Math.abs( ( relationship.author1Contribs.nb_commits - relationship.author2Contribs.nb_commits ) / totalValue );
+      return  (1-Math.abs( ( relationship.author1Contribs.nb_commits - relationship.author2Contribs.nb_commits ) / totalValue ))*100;
     case "MOST_CONTRIBS":
       totalValue = relationship.author1Contribs.nb_line_change + relationship.author2Contribs.nb_line_change;
-      return 1 - Math.abs( ( relationship.author1Contribs.nb_line_change - relationship.author2Contribs.nb_line_change ) / totalValue );
+      return  (1-Math.abs( ( relationship.author1Contribs.nb_line_change - relationship.author2Contribs.nb_line_change ) / totalValue ))*100;
     default:
       return 0;
   }
