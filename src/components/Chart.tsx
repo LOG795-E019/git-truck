@@ -43,6 +43,7 @@ type Relationship =
   commonFiles: string[]
   author1Contribs: { nb_commits: number; nb_line_change: number }
   author2Contribs: { nb_commits: number; nb_line_change: number }
+  cohesions: {commits: number; line_change: number}
 }
 
 type RelationshipMap = Record<
