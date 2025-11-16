@@ -14,7 +14,7 @@ export function RelationshipDistFragment(props: RelationshipDistFragProps) {
   const authorsRelationships = getAuthorsRelationships(databaseInfo)
   // Correct way to access relationships for the author:
   const authorRelationships = authorsRelationships[props.author]?.Relationships || {}
-  console.log(authorRelationships)
+  //console.log(authorRelationships)
 
   if (!props.show || Object.keys(authorRelationships).length === 0) return null
 

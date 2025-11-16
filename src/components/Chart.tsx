@@ -1259,7 +1259,16 @@ function createAuthorNetworkHierarchy(
 
   // Get relationships map
   const relationshipsMap = getAuthorsRelationships(databaseInfo)
+  console.log("Relationships Map:", relationshipsMap)
+  const uniqueRelationshipsList = {};
 
+  Object.entries(relationshipsMap).flatMap(([author1, relObj]) =>
+              Object.entries(relObj.Relationships).flatMap(([author2, relData]) => {
+               //
+              })
+            );
+
+  // Create author nodes with sizes based on selected metric
   const authorNodes: GitBlobObject[] = authorEntries.map(([author, stats], index) => {
     let value: number
     switch (sizeMetricType) {
@@ -1280,6 +1289,7 @@ function createAuthorNetworkHierarchy(
     const maxSize = maxBubbleSize
     const scaledSize = minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
 
+    
     return {
       type: "blob",
       name: author,
@@ -1315,6 +1325,7 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
           commonFiles: string[]
           author1Contribs: { nb_commits: number; nb_line_change: number }
           author2Contribs: { nb_commits: number; nb_line_change: number }
+          cohesions: { commits: number; line_change: number }
         }
       >
     }
@@ -1360,20 +1371,34 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
               nb_line_change: acc.nb_line_change + authorsFileStats[author2][file].nb_line_change
             }),
             { nb_commits: 0, nb_line_change: 0 }
-          )
+          ),
+          cohesions: { commits: 0, line_change: 0 }
         }
+        const totalCommits = relData.author1Contribs.nb_commits + relData.author2Contribs.nb_commits
+        const totalLineChange = relData.author1Contribs.nb_line_change + relData.author2Contribs.nb_line_change
+        //console.log(`Authors: ${author1} & ${author2} - Total Commits: ${totalCommits}, Total Line Change: ${totalLineChange}`);
+        if (totalCommits > 0 && totalLineChange > 0) {
+          relData.cohesions = {
+            commits: totalCommits? 1-Math.abs((relData.author1Contribs.nb_commits / totalCommits) - (relData.author2Contribs.nb_commits / totalCommits)):0,
+            line_change: totalLineChange ? 1-Math.abs((relData.author1Contribs.nb_line_change / totalLineChange) - (relData.author2Contribs.nb_line_change / totalLineChange)):0,
+          }
+          
+        }
+       
         relationshipMap[author1].Relationships[author2] = relData
         relationshipMap[author2].Relationships[author1] = {
           commonFiles,
           author1Contribs: relData.author2Contribs,
-          author2Contribs: relData.author1Contribs
+          author2Contribs: relData.author1Contribs,
+          cohesions: relData.cohesions,
         }
       }
     }
   }
-
   return relationshipMap
 }
+
+
 
 // Helper function to create author nodes for a specific file
 function createAuthorNodesForFile(
