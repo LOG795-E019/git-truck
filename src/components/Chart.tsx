@@ -1441,8 +1441,8 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
         //console.log(`Authors: ${author1} & ${author2} - Total Commits: ${totalCommits}, Total Line Change: ${totalLineChange}`);
         if (totalCommits > 0 && totalLineChange > 0) {
           relData.cohesions = {
-            commits: totalCommits? 1-Math.abs((relData.author1Contribs.nb_commits / totalCommits) - (relData.author2Contribs.nb_commits / totalCommits)):0,
-            line_change: totalLineChange ? 1-Math.abs((relData.author1Contribs.nb_line_change / totalLineChange) - (relData.author2Contribs.nb_line_change / totalLineChange)):0,
+            commits: totalCommits? (1-(Math.abs(relData.author1Contribs.nb_commits  - relData.author2Contribs.nb_commits )/ totalCommits))*100:0,
+            line_change: totalLineChange ? (1-(Math.abs((relData.author1Contribs.nb_line_change ) - (relData.author2Contribs.nb_line_change ))/ totalLineChange))*100:0,
           }
           
         }
@@ -1457,6 +1457,7 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
       }
     }
   }
+  console.log("RelationShipMap",relationshipMap);
   return relationshipMap
 }
 
@@ -1482,12 +1483,12 @@ function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeM
       if(!existingEdges.has(node + ";" + key) && !existingEdges.has(key + ";" + node)){
         // --Calculate weight here--
 
-        const weight = getRelationshipWeight(value, sizeMetricType);
-        if(weight>60){
+        
+        if(sizeMetricType=== "MOST_CONTRIBS" ? value.cohesions.line_change: value.cohesions.commits > 60){
           edge_data.push({
             source: node,
             target: key,
-            weight: weight,
+            weight: sizeMetricType=== "MOST_CONTRIBS" ? value.cohesions.line_change: value.cohesions.commits,
           });
           // Add new pair to existing Edges.
           existingEdges.set(node + ";" + key, true);
@@ -1507,20 +1508,6 @@ function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeM
   } catch (err) {
     console.error("jLouvain error:", err)
     return {}
-  }
-}
-
-function getRelationshipWeight(relationship: Relationship, sizeMetricType: SizeMetricType){
-  let totalValue = 0;
-  switch (sizeMetricType) {
-    case "MOST_COMMITS":
-      totalValue = relationship.author1Contribs.nb_commits + relationship.author2Contribs.nb_commits;
-      return  (1-Math.abs( ( relationship.author1Contribs.nb_commits - relationship.author2Contribs.nb_commits ) / totalValue ))*100;
-    case "MOST_CONTRIBS":
-      totalValue = relationship.author1Contribs.nb_line_change + relationship.author2Contribs.nb_line_change;
-      return  (1-Math.abs( ( relationship.author1Contribs.nb_line_change - relationship.author2Contribs.nb_line_change ) / totalValue ))*100;
-    default:
-      return 0;
   }
 }
 
