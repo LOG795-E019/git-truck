@@ -340,8 +340,8 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
 
                 // Opacity, show top co authors
                 const isInTop = author1 === selectedAuthor && topCoAuthors.includes(author2)
-                const lineOpacity = isInTop ? 0.9 : 0.1
-
+                let lineOpacity = isInTop ? 0.9 : 0.1
+                groupingType === "SUPERVISOR" ? lineOpacity = 0 : null;
                 // ...existing code...
                 if (!selectedAuthor) {
                   return [
@@ -428,7 +428,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
               : selectedAuthor === d.data.name || topCoAuthors.includes(d.data.name)
                 ? "opacity-100" // top coauthors or selected author
                 : "opacity-30"
-
+            
             return (
               <g
                 key={d.data.path}
@@ -584,7 +584,7 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
   }, [d, metricsData, metricType, chartType, groupingType]) // Add groupingType to dependencies
 
   // Don't render the author-network container node in AUTHOR_GRAPH
-  if (chartType === "AUTHOR_GRAPH" && d.data.name === "author-network") {
+  if (chartType === "AUTHOR_GRAPH" && d.data.name === "author-network" && groupingType === "DEFAULT") {
     return null
   }
 
@@ -982,13 +982,15 @@ function createPartitionedHiearchy(
     return bPartition
   } else if (chartType === "AUTHOR_GRAPH") {
     // Create a network/graph layout for author relationships
+    
     const authorNetwork = createAuthorNetworkHierarchy(
       databaseInfo,
       currentTree,
       sizeMetricType,
       minBubbleSize,
       maxBubbleSize,
-      selectedAuthors
+      selectedAuthors,
+      groupingType
     )
 
     // Apply a custom sum function that gives each author a fixed size
@@ -1269,7 +1271,8 @@ function createAuthorNetworkHierarchy(
   sizeMetricType: SizeMetricType,
   minBubbleSize: number,
   maxBubbleSize: number,
-  selectedAuthors: string[]
+  selectedAuthors: string[],
+  groupingType: GroupingType
 ): HierarchyNode<GitObject> {
   const fixedAuthorSize = 1000
 
@@ -1345,7 +1348,37 @@ function createAuthorNetworkHierarchy(
       communityColor
     }
   })
+  
+  if(groupingType === "SUPERVISOR"){
+    const communityMap: Record<string, GitBlobObject[]> = {}
+    for (const node of authorNodes) {
+      const cid = (node as any).communityId ?? "0"
+      if (!communityMap[cid]) communityMap[cid] = []      
+      node.path = tree.path + `/community-${cid}/@${node.name}`
+      communityMap[cid].push(node)
+    }
 
+    const communityNodes: GitTreeObject[] = Object.entries(communityMap).map(([cid, members]) => {
+      return {
+        type: "tree",
+        name: `community-${cid}`,
+        path: tree.path + `/community-${cid}`,
+        children: members,
+        hash: hashString(`community-${cid}-` + members.map((m) => m.hash).join(","))
+      }
+    })
+
+    const authorNetworkByCommunityRoot: GitTreeObject = {
+      type: "tree",
+      name: "author-network-group",
+      path: tree.path,
+      children: communityNodes,
+      hash: hashString("author-network-by-community" + communityNodes.map((c) => c.hash).join(","))
+    }
+    return hierarchy(authorNetworkByCommunityRoot as GitObject)
+  }
+// Group authors by community into tree nodes
+  
   const authorNetworkRoot: GitTreeObject = {
     type: "tree",
     name: "author-network",
