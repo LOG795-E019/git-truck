@@ -37,6 +37,7 @@ import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
 import { createHash } from "crypto"
 import fileTypeRulesJSON from "./fileTypeRules.json"
 import jLouvain from "~/utils/jLouvainWrapper"
+import { group } from "console"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -523,8 +524,11 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
       const authorName = d.data.name
       // Some author nodes may include a precomputed communityColor property
       //TODO: SELECT COMMUNITY COLOR ONLY IF GROUPING SUPERVISOR IS SELECTED
-      const communityColor = (d.data as any).communityColor as string | undefined
-      fillColor = communityColor ?? authorColors.get(authorName) ?? "#cccccc"
+      if(groupingType === "SUPERVISOR"){
+        fillColor = (d.data as any).communityColor as string 
+      }else{
+        fillColor = authorColors.get(authorName) ?? "#cccccc"
+      }
     } else if (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) {
       // For file authors view, use author colors
       const authorName = d.data.name
@@ -1445,24 +1449,22 @@ function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeM
       if(!existingEdges.has(node + ";" + key) && !existingEdges.has(key + ";" + node)){
         // --Calculate weight here--
 
-        //The if was for testing
-        //if(Math.floor(Math.random()*3) % 3 == 0){
+        const weight = getRelationshipWeight(value, sizeMetricType);
+        if(weight>60){
           edge_data.push({
             source: node,
             target: key,
-            weight: getRelationshipWeight(value, sizeMetricType),
+            weight: weight,
           });
           // Add new pair to existing Edges.
           existingEdges.set(node + ";" + key, true);
-        //}
+        }
 
       }
     }
   })
 
   // --Code for grouping using library here--
-  console.log("nodeData: ", node_data);
-  console.log("edge: ", edge_data);
   // Use the typed wrapper around the bundled jLouvain implementation
   try {
     const community = jLouvain().nodes(node_data).edges(edge_data)
