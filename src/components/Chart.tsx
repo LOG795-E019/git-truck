@@ -77,14 +77,14 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
     selectedAuthors,
     fileGroups,
     selectedFilePaths,
-    fileAuthorMode
+    fileAuthorMode,
+    cohesionRatio
   } = useOptions()
   const { path } = usePath()
   const { clickedObject, setClickedObject } = useClickedObject()
   const { setPath } = usePath()
   const { showFilesWithoutChanges, showFilesWithNoJSONRules } = useOptions()
   const [, authorColors] = useMetrics()
-
   const [selectedAuthorName, setSelectedAuthorName] = useState<string>("")
   // Get relationships map
   const relationshipsMap = getAuthorsRelationships(databaseInfo)
@@ -146,7 +146,8 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       selectedAuthors,
       fileGroups,
       selectedFilePaths, // Add this parameter
-      fileAuthorMode // Add this parameter
+      fileAuthorMode,
+      cohesionRatio
     ).descendants()
     console.timeEnd("nodes")
     return res
@@ -163,7 +164,8 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
     selectedAuthors,
     fileGroups,
     selectedFilePaths,
-    fileAuthorMode
+    fileAuthorMode,
+    cohesionRatio
   ])
 
   useEffect(() => {
@@ -745,7 +747,8 @@ function createPartitionedHiearchy(
   selectedAuthors: string[],
   fileGroups: Array<{ id: string; name: string; pattern: string; filePaths: string[] }>,
   selectedFilePaths: string[], // Add this parameter
-  fileAuthorMode: "groups" | "individual" // Add this parameter
+  fileAuthorMode: "groups" | "individual",// Add this parameter
+  cohesionRatio: number 
 ) {
   let currentTree = tree
   const steps = path.substring(tree.name.length + 1).split("/")
@@ -990,7 +993,8 @@ function createPartitionedHiearchy(
       minBubbleSize,
       maxBubbleSize,
       selectedAuthors,
-      groupingType
+      groupingType,
+      cohesionRatio
     )
 
     // Apply a custom sum function that gives each author a fixed size
@@ -1272,7 +1276,8 @@ function createAuthorNetworkHierarchy(
   minBubbleSize: number,
   maxBubbleSize: number,
   selectedAuthors: string[],
-  groupingType: GroupingType
+  groupingType: GroupingType,
+  cohesionRatio: number
 ): HierarchyNode<GitObject> {
   const fixedAuthorSize = 1000
 
@@ -1290,7 +1295,7 @@ function createAuthorNetworkHierarchy(
   // Get relationships map
   const relationshipsMap = getAuthorsRelationships(databaseInfo)
   // Build community partition and community color mapping
-  const partition = getAuthorGroups(relationshipsMap, sizeMetricType)
+  const partition = getAuthorGroups(relationshipsMap, sizeMetricType, cohesionRatio)
   const communityIds = Array.from(new Set(Object.values(partition)))
   function hashCode(str: string) {
     let h = 0
@@ -1457,7 +1462,6 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
       }
     }
   }
-  console.log("RelationShipMap",relationshipMap);
   return relationshipMap
 }
 
@@ -1467,7 +1471,7 @@ interface Edge {
   weight: number
 }
 
-function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeMetricType){
+function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeMetricType, cohesionRatio:number){
   // We get the list of author names that have relationships.
   const node_data = Object.keys(relationshipMap); 
 
@@ -1483,7 +1487,8 @@ function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeM
       if(!existingEdges.has(node + ";" + key) && !existingEdges.has(key + ";" + node)){
         // --Calculate weight here--
         const cohesion = sizeMetricType=== "MOST_CONTRIBS" ? value.cohesions.line_change: value.cohesions.commits
-        if(cohesion > 60){
+        console.log("cohesionRatio: ",cohesionRatio);
+        if(cohesion > cohesionRatio){
           edge_data.push({
             source: node,
             target: key,
@@ -1496,7 +1501,6 @@ function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeM
       }
     }
   })
-  console.log("Edge Data: ",edge_data);
   // --Code for grouping using library here--
   // Use the typed wrapper around the bundled jLouvain implementation
   try {

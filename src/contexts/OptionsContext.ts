@@ -66,7 +66,8 @@ export type Options = {
   selectedFiles: string[]
   fileGroups: FileGroup[]
   selectedFilePaths: string[] // Keep this for individual files
-  fileAuthorMode: "groups" | "individual" // Add this new property
+  fileAuthorMode: "groups" | "individual" 
+  cohesionRatio: number// Add this new property
 }
 
 export type OptionsContextType = Options & {
@@ -92,7 +93,8 @@ export type OptionsContextType = Options & {
   setSelectedFiles: (files: string[]) => void
   setSelectedFilePaths: (filePaths: string[]) => void // Updated setter
   setFileGroups: (fileGroups: FileGroup[]) => void // Add this line
-  setFileAuthorMode: (mode: "groups" | "individual") => void // Add this line
+  setFileAuthorMode: (mode: "groups" | "individual") => void 
+  setCohesionRatio: (cohesion: number) => void
 }
 
 export const OptionsContext = createContext<OptionsContextType | undefined>(undefined)
@@ -129,7 +131,8 @@ const defaultOptions: Options = {
   selectedFiles: [],
   fileGroups: [],
   selectedFilePaths: [],
-  fileAuthorMode: "individual" // Default to individual mode
+  fileAuthorMode: "individual",// Default to individual mode
+  cohesionRatio:60 
 }
 
 export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {}): OptionsContextType {
@@ -204,6 +207,9 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setFileAuthorMode: () => {
       throw new Error("No setFileAuthorModeSetter provided")
+    },
+    setCohesionRatio: () => {
+      throw new Error("No setCohesionRatio provided")
     }
   }
 }

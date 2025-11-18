@@ -35,6 +35,7 @@ import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
 import type { GroupingType } from "~/metrics/grouping"
 import { Grouping } from "~/metrics/grouping"
+import Slider from '@mui/material/Slider';
 
 export const relatedSizeMetric: Record<MetricType, SizeMetricType> = {
   FILE_TYPE: "FILE_SIZE",
@@ -53,13 +54,15 @@ export const Options = memo(function Options() {
     groupingType,
     selectedAuthors,
     selectedFiles,
+    cohesionRatio,
     setMetricType,
     setChartType,
     setSizeMetricType,
     setGroupingType,
     setSelectedAuthors,
     setSelectedFiles,
-    setSelectedFilePaths
+    setSelectedFilePaths,
+    setCohesionRatio
   } = useOptions()
 
   const { databaseInfo } = useData()
@@ -92,6 +95,14 @@ export const Options = memo(function Options() {
       authorInitializedRef.current = true
     }
   }, [allAuthors, selectedAuthors, setSelectedAuthors])
+
+  useEffect(() => {
+    if (
+      cohesionRatio === undefined  
+    ) {
+      setCohesionRatio(60)
+    }
+  }, [cohesionRatio, setCohesionRatio])
 
   useEffect(() => {
     if (
@@ -282,6 +293,7 @@ export const Options = memo(function Options() {
     setMinLineChanges(undefined)
     setMaxLineChanges(undefined)
     setSearchFilter("")
+    setCohesionRatio(60)
   }
 
   const resetAllFilters = () => {
@@ -659,6 +671,22 @@ export const Options = memo(function Options() {
                             setMaxLineChanges(value)
                           }}
                         />
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <label htmlFor="line-changes-min" className="text-xs font-medium">
+                        Cohesion
+                      </label>
+                      <div className="flex items-center gap-1 w-full">
+                          <Slider defaultValue={50} aria-label="Default" valueLabelDisplay="auto" sx={{ width: 100, color: 'success.main' }}
+                            value={cohesionRatio} 
+                            onChange={(e, newValue) =>{e.stopPropagation();setCohesionRatio(newValue);}}
+                            step={10}
+                            marks
+                            min={10}
+                            max={90}
+                          />
+                          
                       </div>
                     </div>
                   </div>
