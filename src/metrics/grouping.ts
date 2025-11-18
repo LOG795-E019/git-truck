@@ -5,7 +5,7 @@ export const Grouping = {
   FILE_AUTHORS: "File Authors",
   AUTHOR_FILES: "Author Files",
   DEFAULT: "Default",
-  SUPERVISOR: "Supervisor",
+  COMMUNITY: "Community",
 }
 
 export type GroupingType = keyof typeof Grouping

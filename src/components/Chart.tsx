@@ -341,7 +341,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                 // Opacity, show top co authors
                 const isInTop = author1 === selectedAuthor && topCoAuthors.includes(author2)
                 let lineOpacity = isInTop ? 0.9 : 0.1
-                groupingType === "SUPERVISOR" ? lineOpacity = 0 : null;
+                groupingType === "COMMUNITY" ? lineOpacity = 0 : null;
                 // ...existing code...
                 if (!selectedAuthor) {
                   return [
@@ -523,8 +523,8 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
       // For author graph, prefer community color if present, otherwise per-author color
       const authorName = d.data.name
       // Some author nodes may include a precomputed communityColor property
-      //TODO: SELECT COMMUNITY COLOR ONLY IF GROUPING SUPERVISOR IS SELECTED
-      if(groupingType === "SUPERVISOR"){
+      //TODO: SELECT COMMUNITY COLOR ONLY IF GROUPING COMMUNITY IS SELECTED
+      if(groupingType === "COMMUNITY"){
         fillColor = (d.data as any).communityColor as string 
       }else{
         fillColor = authorColors.get(authorName) ?? "#cccccc"
@@ -1349,7 +1349,7 @@ function createAuthorNetworkHierarchy(
     }
   })
   
-  if(groupingType === "SUPERVISOR"){
+  if(groupingType === "COMMUNITY"){
     const communityMap: Record<string, GitBlobObject[]> = {}
     for (const node of authorNodes) {
       const cid = (node as any).communityId ?? "0"
@@ -1442,7 +1442,7 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
         if (totalCommits > 0 && totalLineChange > 0) {
           relData.cohesions = {
             commits: totalCommits? (1-(Math.abs(relData.author1Contribs.nb_commits  - relData.author2Contribs.nb_commits )/ totalCommits))*100:0,
-            line_change: totalLineChange ? (1-(Math.abs((relData.author1Contribs.nb_line_change ) - (relData.author2Contribs.nb_line_change ))/ totalLineChange))*100:0,
+            line_change: totalLineChange ? (1-(Math.abs(relData.author1Contribs.nb_line_change  - relData.author2Contribs.nb_line_change )/ totalLineChange))*100:0,
           }
           
         }
@@ -1482,13 +1482,12 @@ function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeM
       // If not, create it.
       if(!existingEdges.has(node + ";" + key) && !existingEdges.has(key + ";" + node)){
         // --Calculate weight here--
-
-        
-        if(sizeMetricType=== "MOST_CONTRIBS" ? value.cohesions.line_change: value.cohesions.commits > 60){
+        const cohesion = sizeMetricType=== "MOST_CONTRIBS" ? value.cohesions.line_change: value.cohesions.commits
+        if(cohesion > 60){
           edge_data.push({
             source: node,
             target: key,
-            weight: sizeMetricType=== "MOST_CONTRIBS" ? value.cohesions.line_change: value.cohesions.commits,
+            weight: cohesion,
           });
           // Add new pair to existing Edges.
           existingEdges.set(node + ";" + key, true);
@@ -1497,7 +1496,7 @@ function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeM
       }
     }
   })
-
+  console.log("Edge Data: ",edge_data);
   // --Code for grouping using library here--
   // Use the typed wrapper around the bundled jLouvain implementation
   try {

@@ -200,7 +200,7 @@ export const Options = memo(function Options() {
     AUTHOR_FILES: mdiAccountMultiple,
     FILE_AUTHORS: mdiAccountNetwork,
     DEFAULT:mdiAccount,
-    SUPERVISOR:mdiAccountSupervisorCircle,
+    COMMUNITY:mdiAccountSupervisorCircle,
   }
 
   const chartTypeIcons: Record<ChartType, string> = {
@@ -210,19 +210,19 @@ export const Options = memo(function Options() {
   }
 
   // Compute grouping options depending on chart type. When not in AUTHOR_GRAPH,
-  // exclude DEFAULT and SUPERVISOR. Use strict equality checks.
+  // exclude DEFAULT and COMMUNITY. Use strict equality checks.
   const groupingOptions = useMemo(() => {
     if (chartType === "AUTHOR_GRAPH") {
       return (
         Object.fromEntries(
-          Object.entries(Grouping).filter(([key]) => key === "DEFAULT" || key === "SUPERVISOR")
+          Object.entries(Grouping).filter(([key]) => key === "DEFAULT" || key === "COMMUNITY")
         ) as Record<GroupingType, string>
       )
     }
 
     return (
       Object.fromEntries(
-        Object.entries(Grouping).filter(([key]) => key !== "DEFAULT" && key !== "SUPERVISOR")
+        Object.entries(Grouping).filter(([key]) => key !== "DEFAULT" && key !== "COMMUNITY")
       ) as Record<GroupingType, string>
     )
   }, [chartType])
