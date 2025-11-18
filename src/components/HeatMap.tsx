@@ -121,7 +121,7 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
           .attr("stroke-width", 1)
           .style("cursor", "pointer")
           .on("mouseover", function () {
-            d3.select(this).attr("stroke", "#000").attr("stroke-width", 2)
+            d3.select(this).attr("stroke", "#666").attr("stroke-width", 2)
           })
           .on("mouseout", function () {
             d3.select(this).attr("stroke", "#fff").attr("stroke-width", 1)
