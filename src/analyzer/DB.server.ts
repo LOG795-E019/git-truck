@@ -830,43 +830,59 @@ export default class DB {
   }
 
   public async getHeatmapData(timerange: [number, number], metric: string) {
+    // Get all authors
     const allAuthorsRes = await this.query(`
-      SELECT DISTINCT author
-      FROM filechanges_commits_renamed_cached
-      WHERE committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
-      ORDER BY author;
-    `)
+    SELECT DISTINCT author
+    FROM filechanges_commits_renamed_cached
+    WHERE committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+    ORDER BY author;
+  `)
 
     const authors = allAuthorsRes.map((row) => row["author"] as string)
 
+    // Get per-file data per author pair
     const res = await this.query(`
-      SELECT
-        a1.author as author1,
-        a2.author as author2,
-        COUNT(DISTINCT a1.filepath) as shared_files,
-        SUM(a1.insertions + a1.deletions + a2.insertions + a2.deletions) as total_line_changes,
-        COUNT(DISTINCT a1.commithash) + COUNT(DISTINCT a2.commithash) as total_commits
-      FROM filechanges_commits_renamed_cached a1
-      JOIN filechanges_commits_renamed_cached a2
-        ON a1.filepath = a2.filepath
-        AND a1.author < a2.author
-      WHERE a1.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
-        AND a2.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
-      GROUP BY a1.author, a2.author
-      ORDER BY a1.author, a2.author;
-    `)
+    SELECT
+      a1.author AS author1,
+      a2.author AS author2,
+      a1.filepath AS file,
+      COUNT(DISTINCT a1.commithash) + COUNT(DISTINCT a2.commithash) AS total_commits,
+      SUM(a1.insertions + a1.deletions + a2.insertions + a2.deletions) AS total_line_changes,
+      1 AS shared_files
+    FROM filechanges_commits_renamed_cached a1
+    JOIN filechanges_commits_renamed_cached a2
+      ON a1.filepath = a2.filepath
+      AND a1.author < a2.author
+    WHERE a1.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+      AND a2.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+    GROUP BY a1.author, a2.author, a1.filepath
+    ORDER BY a1.author, a2.author;
+  `)
 
-    const collaborations = res.map((row) => ({
+    // Map collaborations per file
+    const collaborations: {
+      author1: string
+      author2: string
+      sharedFiles: number
+      totalLineChanges: number
+      totalCommits: number
+      file: string
+    }[] = res.map((row) => ({
       author1: row["author1"] as string,
       author2: row["author2"] as string,
+      file: row["file"] as string,
       sharedFiles: Number(row["shared_files"]),
       totalLineChanges: Number(row["total_line_changes"]),
       totalCommits: Number(row["total_commits"])
     }))
 
+    // Build matrix for heatmap
     const matrix: number[][] = Array(authors.length)
       .fill(0)
       .map(() => Array(authors.length).fill(0))
+
+    // Also build a per-author-pair map for file metrics
+    const collaborationsMap: Record<string, typeof collaborations> = {}
 
     collaborations.forEach((c) => {
       const i = authors.indexOf(c.author1)
@@ -889,13 +905,18 @@ export default class DB {
 
       matrix[i][j] = value
       matrix[j][i] = value
+
+      const key = `${c.author1} - ${c.author2}`
+      if (!collaborationsMap[key]) collaborationsMap[key] = []
+      collaborationsMap[key].push(c)
     })
 
+    // Zero out diagonal
     for (let i = 0; i < authors.length; i++) {
       matrix[i][i] = 0
     }
 
-    return { authors, matrix }
+    return { authors, matrix, collaborationsMap }
   }
 
   public getWeekNumber(date: Date): number {

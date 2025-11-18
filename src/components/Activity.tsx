@@ -233,7 +233,7 @@ const Activity = ({ filetree, sizeMetric }: ActivityProps) => {
     const gridHeight = numRows * (cellSize + cellPadding)
 
     const xOffset = leftPadding
-    const yOffset = topPadding
+    const yOffset = (height - gridHeight) / 2
 
     console.log(`Year ${selectedYear} grid:`, numCols, "cols x", numRows, "rows")
 
@@ -298,7 +298,7 @@ const Activity = ({ filetree, sizeMetric }: ActivityProps) => {
     }
 
     // Add day labels
-    const dayLabels = ["Mon", "", "Wed", "", "Fri", "", ""]
+    const dayLabels = ["", "Mon", "", "Wed", "", "Fri", ""]
     dayLabels.forEach((label, i) => {
       if (label) {
         svg

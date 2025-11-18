@@ -6,17 +6,21 @@ import type { GitTreeObject } from "~/analyzer/model"
 import { useFetcher } from "@remix-run/react"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 
-type HeatmapFetcherData = {
-  authors: string[]
-  matrix: number[][]
-}
-
 interface HeatmapProps {
   filetree: GitTreeObject
   sizeMetric: SizeMetricType
 }
 
 const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
+  const [heatmapData, setHeatmapData] = useState<{
+    authors: string[]
+    matrix: number[][]
+    collaborationsMap?: Record<string, any>
+  }>({
+    authors: [],
+    matrix: []
+  })
+
   const svgRef = useRef<SVGSVGElement>(null)
   const { databaseInfo, repo } = useData()
   const [ref, rawSize] = useComponentSize()
@@ -44,8 +48,72 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
     }
   }, [])
 
+  // Get metric label for display
+  const metricLabel =
+    sizeMetric === "MOST_COMMITS" ? "Commits" : sizeMetric === "MOST_CONTRIBS" ? "Line changes" : "Shared Files"
+
   const [authors, setAuthors] = useState<string[]>([])
   const [matrix, setMatrix] = useState<number[][]>([])
+  const [collaborationsMap, setCollaborationsMap] = useState<Record<string, typeof fetcher.data.collaborationsMap>>({})
+
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(null)
+
+  const renderLeftPanel = () => (
+    <div className="w-64 flex-shrink-0 overflow-y-auto rounded-lg border bg-white px-4 py-3 text-sm shadow-sm">
+      <h3 className="mb-2 font-semibold text-gray-800">Co-Activity Details</h3>
+
+      {selectedLabel ? (
+        <div className="mt-2 space-y-3">
+          {/* Individuals Section */}
+          <div>
+            <p className="mb-1 text-xs font-bold uppercase text-gray-600">Individuals</p>
+            {selectedLabel.split(" - ").map((user, idx) => (
+              <p key={idx} className="text-sm text-gray-800">
+                {user}
+              </p>
+            ))}
+          </div>
+
+          {/* Metric Section */}
+          <div>
+            <p className="mb-1 text-xs font-bold uppercase text-gray-600">Metric Value</p>
+            <p className="text-sm text-gray-800">
+              {collaborationsMap[selectedLabel]?.reduce((sum, f) => {
+                switch (sizeMetric) {
+                  case "MOST_COMMITS":
+                    return sum + f.totalCommits
+                  case "MOST_CONTRIBS":
+                    return sum + f.totalLineChanges
+                  case "FILE_SIZE":
+                    return sum + f.sharedFiles
+                  default:
+                    return sum
+                }
+              }, 0) ?? 0}{" "}
+              {metricLabel}
+            </p>
+          </div>
+
+          {/* Files Impacted Section */}
+          <div>
+            <p className="mb-1 text-xs font-bold uppercase text-gray-600">Files Impacted</p>
+            <div className="max-h-96 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500">
+              {collaborationsMap[selectedLabel]?.map((file) => (
+                <div key={file.file} className="mb-1">
+                  <p className="text-gray-700">{file.file}</p>
+                  <p className="text-xs text-gray-500">
+                    Commits: {file.totalCommits}, Lines: {file.totalLineChanges}
+                  </p>
+                </div>
+              )) ?? <p className="text-gray-400">No data</p>}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">Click a cell in the heatmap to view details</p>
+      )}
+    </div>
+  )
 
   useEffect(() => {
     console.log("Heatmap data")
@@ -59,12 +127,47 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
     fetcher.load(`/heatmap?${params}`)
   }, [databaseInfo.selectedRange, repo.name, databaseInfo.branch, sizeMetric])
 
+  // useEffect(() => {
+  //   if (fetcher.data) {
+  //     setAuthors(fetcher.data.authors)
+  //     setMatrix(fetcher.data.matrix)
+  //     setCollaborationsMap(fetcher.data.collaborationsMap)
+  //   }
+  // }, [fetcher.data])
+
   useEffect(() => {
     if (fetcher.data) {
       setAuthors(fetcher.data.authors)
-      setMatrix(fetcher.data.matrix)
+      setCollaborationsMap(fetcher.data.collaborationsMap)
+
+      // Build a matrix by summing all files per author pair
+      const newMatrix: number[][] = fetcher.data.authors.map((a1, i) =>
+        fetcher.data.authors.map((a2, j) => {
+          if (i === j) return 0 // diagonal
+
+          const key1 = `${a1} - ${a2}`
+          const key2 = `${a2} - ${a1}`
+
+          const files = fetcher.data.collaborationsMap[key1] ?? fetcher.data.collaborationsMap[key2] ?? []
+
+          return files.reduce((sum, f) => {
+            switch (sizeMetric) {
+              case "MOST_COMMITS":
+                return sum + f.totalCommits
+              case "MOST_CONTRIBS":
+                return sum + f.totalLineChanges
+              case "FILE_SIZE":
+                return sum + f.sharedFiles
+              default:
+                return sum
+            }
+          }, 0)
+        })
+      )
+
+      setMatrix(newMatrix)
     }
-  }, [fetcher.data])
+  }, [fetcher.data, sizeMetric])
 
   useEffect(() => {
     if (!svgRef.current || !visible || authors.length === 0 || matrix.length === 0) {
@@ -81,7 +184,7 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
     const svgWidth = parentRect?.width || 800
     const svgHeight = parentRect?.height || 600
 
-    const margin = { top: 120, right: 20, bottom: 20, left: 120 }
+    const margin = { top: 160, right: 60, bottom: 60, left: 160 }
     const width = svgWidth - margin.left - margin.right
     const height = svgHeight - margin.top - margin.bottom
 
@@ -98,34 +201,164 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
       .attr("viewBox", `0 0 ${svgWidth} ${svgHeight}`)
       .attr("preserveAspectRatio", "xMidYMid meet")
 
+    const bounding = svgElement.getBoundingClientRect()
+    svg
+      .append("text")
+      .attr("x", bounding.width / 2 + 40)
+      .attr("y", margin.top / 6)
+      .attr("text-anchor", "middle")
+      .style("dominant-baseline", "middle")
+      .attr("font-size", "15px")
+      .attr("font-weight", "600")
+      .text(`${metricLabel} - File Co-Activity`)
+
     const g = svg.append("g").attr("transform", `translate(${xOffset},${yOffset})`)
 
-    const maxValue = d3.max(matrix.flatMap((row) => row)) || 1
+    // LEGEND
 
-    const colorScale = d3
-      .scaleSequential()
+    const allValues = matrix.flatMap((row) => row).filter((v) => v > 0)
+    const sortedValues = allValues.sort(d3.ascending)
+
+    const actualMaxValue = d3.max(matrix.flatMap((row) => row)) || 1
+    const minValue = d3.min(allValues) || 0
+    const maxValue = actualMaxValue
+
+    const verticalLegendWidth = 15 // Largeur de la barre
+    const verticalLegendHeight = 200 // Hauteur de la barre
+    const legendPadding = 20
+
+    const legendX = xOffset + matrixWidth + legendPadding
+    const legendY = yOffset + (matrixHeight - verticalLegendHeight) / 2 // 3. DÉGRADÉ SVG
+
+    const defs = svg.append("defs")
+    const gradient = defs
+      .append("linearGradient")
+      .attr("id", "activity-gradient-vertical")
+      .attr("x1", "0%")
+      .attr("y1", "100%")
+      .attr("x2", "0%")
+      .attr("y2", "0%")
+
+    const legend = svg.append("g").attr("transform", `translate(${legendX}, ${legendY})`) // 4. DESSIN DE LA BARRE
+
+    legend
+      .append("rect")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", verticalLegendWidth)
+      .attr("height", verticalLegendHeight)
+      .style("fill", "url(#activity-gradient-vertical)")
+      .attr("stroke", "#999")
+      .attr("stroke-width", 1)
+
+    legend
+      .append("text")
+      .attr("x", verticalLegendWidth / 2)
+      .attr("y", -5)
+      .attr("text-anchor", "middle")
+      .style("font-size", "11px")
+      .style("fill", "#666")
+      .text("High") // Low (en bas)
+
+    legend
+      .append("text")
+      .attr("x", verticalLegendWidth / 2)
+      .attr("y", verticalLegendHeight + 5)
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "hanging")
+      .style("font-size", "11px")
+      .style("fill", "#666")
+      .text("Low")
+
+    const markerOffset = verticalLegendWidth + 5
+
+    // const scaleLegend = d3.scaleLinear().domain([minValue, maxValue]).range([verticalLegendHeight, 0])
+    // const addMarker = (value: number, label: string) => {
+    //   const yPos = scaleLegend(value)
+
+    const sqrtScaleLegend = d3
+      .scaleLinear()
       .domain([0, Math.sqrt(maxValue)])
-      .interpolator(d3.interpolateReds)
+      .range([verticalLegendHeight, 0])
+
+    const addMarker = (value: number, label: string) => {
+      const yPos = sqrtScaleLegend(Math.sqrt(value))
+
+      legend
+        .append("line")
+        .attr("x1", verticalLegendWidth)
+        .attr("y1", yPos)
+        .attr("x2", verticalLegendWidth + 3)
+        .attr("y2", yPos)
+        .attr("stroke", "#999")
+        .attr("stroke-width", 0.5)
+
+      legend
+        .append("text")
+        .attr("x", markerOffset)
+        .attr("y", yPos)
+        .attr("text-anchor", "start")
+        .attr("dominant-baseline", "middle")
+        .style("font-size", "9px")
+        .style("fill", "#666")
+        .text(`${label}: ${Math.round(value)}`)
+    }
+
+    addMarker(maxValue, "Max")
+    addMarker(minValue, "Min")
+
+    // const colorScale = d3
+    //   .scaleSequential()
+    //   .domain([0, Math.sqrt(maxValue)])
+    //   .interpolator(d3.interpolateReds)
+
+    // normalization for larger gaps between data
+    const colorScale = d3.scaleSequentialLog().domain([1, maxValue]).interpolator(d3.interpolateReds)
+
+    const legendSteps = 20
+    // for (let i = 0; i <= legendSteps; i++) {
+    //   const t = i / legendSteps // 0 → 1
+    //   gradient
+    //     .append("stop")
+    //     .attr("offset", `${t * 100}%`)
+    //     .attr("stop-color", colorScale(Math.sqrt(maxValue) * t))
+    // }
+    for (let i = 0; i <= legendSteps; i++) {
+      const value = 1 * Math.pow(maxValue / 1, i / legendSteps) // logarithmic spacing
+      gradient
+        .append("stop")
+        .attr("offset", `${(i / legendSteps) * 100}%`)
+        .attr("stop-color", colorScale(value))
+    }
 
     matrix.forEach((row, i) => {
       row.forEach((value, j) => {
+        const isDiagonal = i === j
+
         g.append("rect")
           .attr("x", j * cellSize)
           .attr("y", i * cellSize)
           .attr("width", cellSize)
           .attr("height", cellSize)
-          .attr("fill", value === 0 ? "#f5f5f5" : colorScale(Math.sqrt(value)))
+          //.attr("fill", isDiagonal ? "#ccc" : value === 0 ? "#f5f5f5" : colorScale(Math.sqrt(value)) // using this with scaleSequential
+          .attr("fill", isDiagonal ? "#ccc" : value === 0 ? "#f5f5f5" : colorScale(value)) // using this with scaleSequentialLog
           .attr("stroke", "#fff")
           .attr("stroke-width", 1)
           .style("cursor", "pointer")
           .on("mouseover", function () {
-            d3.select(this).attr("stroke", "#666").attr("stroke-width", 2)
+            if (!isDiagonal) d3.select(this).attr("stroke", "#666").attr("stroke-width", 2)
           })
           .on("mouseout", function () {
-            d3.select(this).attr("stroke", "#fff").attr("stroke-width", 1)
+            if (!isDiagonal) d3.select(this).attr("stroke", "#fff").attr("stroke-width", 1)
+          })
+          .on("click", () => {
+            if (!isDiagonal) {
+              const [a, b] = i < j ? [authors[i], authors[j]] : [authors[j], authors[i]]
+              setSelectedLabel(`${a} - ${b}`)
+            }
           })
           .append("title")
-          .text(`${authors[i]} ↔ ${authors[j]}: ${value}`)
+          .text(isDiagonal ? `${authors[i]} ↔ ${authors[j]}: N/A` : `${authors[i]} ↔ ${authors[j]}: ${value}`)
       })
     })
 
@@ -173,8 +406,11 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
   }
 
   return (
-    <div ref={ref} className="heatmap-container relative h-full w-full overflow-auto">
-      <svg ref={svgRef} width={size.width || 800} height={size.height || 600} className="min-h-full min-w-full" />
+    <div className="flex h-full w-full gap-4 overflow-hidden p-4">
+      {renderLeftPanel()} {/* Left panel on the left */}
+      <div className="flex-1">
+        <svg ref={svgRef} className="h-full w-full" style={{ maxHeight: "100vh", display: "block" }}></svg>
+      </div>
     </div>
   )
 }
