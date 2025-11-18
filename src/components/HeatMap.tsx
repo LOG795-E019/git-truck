@@ -98,11 +98,9 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
       .attr("viewBox", `0 0 ${svgWidth} ${svgHeight}`)
       .attr("preserveAspectRatio", "xMidYMid meet")
 
-    const g = svg
-      .append("g")
-      .attr("transform", `translate(${xOffset},${yOffset})`)
+    const g = svg.append("g").attr("transform", `translate(${xOffset},${yOffset})`)
 
-    const maxValue = d3.max(matrix.flatMap(row => row)) || 1
+    const maxValue = d3.max(matrix.flatMap((row) => row)) || 1
 
     const colorScale = d3
       .scaleSequential()
@@ -142,7 +140,7 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
       .attr("dominant-baseline", "middle")
       .style("font-size", "12px")
       .style("fill", "#333")
-      .text(d => d)
+      .text((d) => d)
 
     g.selectAll(".author-label-x")
       .data(authors)
@@ -155,8 +153,7 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
       .attr("transform", (d, i) => `rotate(-45, ${i * cellSize + cellSize / 2}, -10)`)
       .style("font-size", "12px")
       .style("fill", "#333")
-      .text(d => d)
-
+      .text((d) => d)
   }, [authors, matrix, size, visible])
 
   if (fetcher.state === "loading") {
@@ -177,12 +174,7 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
 
   return (
     <div ref={ref} className="heatmap-container relative h-full w-full overflow-auto">
-      <svg
-        ref={svgRef}
-        width={size.width || 800}
-        height={size.height || 600}
-        className="min-h-full min-w-full"
-      />
+      <svg ref={svgRef} width={size.width || 800} height={size.height || 600} className="min-h-full min-w-full" />
     </div>
   )
 }

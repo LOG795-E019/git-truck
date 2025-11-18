@@ -319,47 +319,50 @@ export const Options = memo(function Options() {
                     Object.entries(SizeMetric).filter(([key]) => key !== "FILE_SIZE" && key !== "LAST_CHANGED")
                   ) as Record<SizeMetricType, string>)
                 : chartType === "ACTIVITY"
-                ? {
-                    MOST_COMMITS: SizeMetric.MOST_COMMITS,
-                    MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
-                    FILE_SIZE: "Files changed"
-                  } as Record<SizeMetricType, string>
-                : chartType === "HEAT_MAP"
-                ? {
-                    MOST_COMMITS: SizeMetric.MOST_COMMITS,
-                    MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
-                    FILE_SIZE: "Shared files"
-                  } as Record<SizeMetricType, string>
-                : SizeMetric
+                  ? ({
+                      MOST_COMMITS: SizeMetric.MOST_COMMITS,
+                      MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
+                      FILE_SIZE: "Files changed"
+                    } as Record<SizeMetricType, string>)
+                  : chartType === "HEAT_MAP"
+                    ? ({
+                        MOST_COMMITS: SizeMetric.MOST_COMMITS,
+                        MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
+                        FILE_SIZE: "Shared files"
+                      } as Record<SizeMetricType, string>)
+                    : SizeMetric
             }
             defaultValue={sizeMetric}
             onChange={(sizeMetric: SizeMetricType) => setSizeMetricType(sizeMetric)}
             iconMap={sizeMetricIcons}
           />
         </fieldset>
-        {chartType !== "AUTHOR_GRAPH" && chartType !== "ACTIVITY" && chartType !== "HEAT_MAP" && groupingType !== "FILE_AUTHORS" && (
-          <fieldset className="rounded-lg border p-2">
-            <legend className="card__title ml-1.5 justify-start gap-2">
-              <Icon path={mdiPalette} size="1.25em" />
-              Color
-            </legend>
-            <EnumSelect
-              enum={Metric}
-              defaultValue={metricType}
-              onChange={(metric: MetricType) => {
-                setMetricType(metric)
-                if (!linkMetricAndSizeMetric) {
-                  return
-                }
-                const relatedSizeMetricType = relatedSizeMetric[metric]
-                if (relatedSizeMetricType) {
-                  setSizeMetricType(relatedSizeMetricType)
-                }
-              }}
-              iconMap={visualizationIcons}
-            />
-          </fieldset>
-        )}
+        {chartType !== "AUTHOR_GRAPH" &&
+          chartType !== "ACTIVITY" &&
+          chartType !== "HEAT_MAP" &&
+          groupingType !== "FILE_AUTHORS" && (
+            <fieldset className="rounded-lg border p-2">
+              <legend className="card__title ml-1.5 justify-start gap-2">
+                <Icon path={mdiPalette} size="1.25em" />
+                Color
+              </legend>
+              <EnumSelect
+                enum={Metric}
+                defaultValue={metricType}
+                onChange={(metric: MetricType) => {
+                  setMetricType(metric)
+                  if (!linkMetricAndSizeMetric) {
+                    return
+                  }
+                  const relatedSizeMetricType = relatedSizeMetric[metric]
+                  if (relatedSizeMetricType) {
+                    setSizeMetricType(relatedSizeMetricType)
+                  }
+                }}
+                iconMap={visualizationIcons}
+              />
+            </fieldset>
+          )}
         {chartType !== "AUTHOR_GRAPH" && chartType !== "ACTIVITY" && chartType !== "HEAT_MAP" && (
           <fieldset className="rounded-lg border p-2">
             <legend className="card__title ml-1.5 justify-start gap-2">
