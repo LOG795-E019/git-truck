@@ -392,7 +392,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                       onMouseLeave={() => setHoveredObject(null)}
                     />
                   ]
-                } else if (selectedAuthor && isInTop) {
+                } else if (selectedAuthor && isInTop && groupingType === "DEFAULT") {
                   return [
                     <line
                       key={`rel-${author1}-${author2}-1`}
@@ -425,7 +425,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
         {/* Draw author nodes and other nodes */}
         {(() => {
           return nodes.map((d, i) => {
-            const nodeOpacity = !selectedAuthor
+            const nodeOpacity = !selectedAuthor || groupingType !== "DEFAULT"
               ? "opacity-100" // all visible when no author selected
               : selectedAuthor === d.data.name || topCoAuthors.includes(d.data.name)
                 ? "opacity-100" // top coauthors or selected author
