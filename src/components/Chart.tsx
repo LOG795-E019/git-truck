@@ -36,7 +36,7 @@ import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
 import { createHash } from "crypto"
 import fileTypeRulesJSON from "./fileTypeRules.json"
 import Activity from "./Activity"
-import Heatmap from "./Heatmap"
+import Heatmap from "./HeatMap"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
