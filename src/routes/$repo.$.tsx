@@ -22,8 +22,11 @@ import { mdiFullscreen, mdiFullscreenExit, mdiChevronRight, mdiChevronLeft } fro
 import { Breadcrumb } from "~/components/Breadcrumb"
 import { FeedbackCard } from "~/components/FeedbackCard"
 import { Chart } from "~/components/Chart"
+import { ActivityFiltersPanel, ActivityStatsPanel, ActivityDataProvider } from "~/components/Activity"
+import { useFetcher } from "@remix-run/react"
 import { Icon } from "@mdi/react"
 import { useClient } from "~/hooks"
+import { useOptions } from "~/contexts/OptionsContext"
 import clsx from "clsx"
 import { Tooltip } from "~/components/Tooltip"
 import { createPortal } from "react-dom"
@@ -381,6 +384,95 @@ async function analyze(params: Params) {
   return fullData
 }
 
+function ClientSideActivityFetcher({ dataPromise }: { dataPromise: any }) {
+  const options = useOptions()
+  const chartType = options.chartType
+  const activityFetcher = useFetcher<{
+    data: Array<{
+      author: string
+      date: string
+      timestamp: number
+      commits: number
+      lineChanges: number
+      fileChanges: number
+    }>
+  }>()
+
+  useEffect(() => {
+    if (chartType === "ACTIVITY" && activityFetcher.state === "idle" && !activityFetcher.data) {
+      const timerange = dataPromise.databaseInfo.selectedRange
+      activityFetcher.load(
+        `/activity?repo=${dataPromise.repo.name}&branch=${dataPromise.repo.currentHead}&startTime=${timerange[0]}&endTime=${timerange[1]}`
+      )
+    }
+  }, [chartType, activityFetcher])
+
+  return null
+}
+function ClientSideActivityProvider({
+  dataPromise,
+  activitySelectedYear,
+  setActivitySelectedYear,
+  activitySelectedAuthor,
+  setSelectedAuthor,
+  activitySelectedDay,
+  setSelectedDay,
+  activityShowAllContributors,
+  setShowAllContributors,
+  children
+}: {
+  dataPromise: any
+  activitySelectedYear: number
+  setActivitySelectedYear: (year: number) => void
+  activitySelectedAuthor: string
+  setSelectedAuthor: (author: string) => void
+  activitySelectedDay: string | null
+  setSelectedDay: (day: string | null) => void
+  activityShowAllContributors: boolean
+  setShowAllContributors: (show: boolean) => void
+  children: React.ReactNode
+}) {
+  const options = useOptions()
+  const chartType = options.chartType
+  const activityFetcher = useFetcher<{
+    data: Array<{
+      author: string
+      date: string
+      timestamp: number
+      commits: number
+      lineChanges: number
+      fileChanges: number
+    }>
+  }>()
+
+  // Fetch activity data when chart type is ACTIVITY
+  useEffect(() => {
+    if (chartType === "ACTIVITY" && activityFetcher.state === "idle" && !activityFetcher.data) {
+      const timerange = dataPromise.databaseInfo.selectedRange
+      activityFetcher.load(
+        `/activity?repo=${dataPromise.repo.name}&branch=${dataPromise.repo.currentHead}&startTime=${timerange[0]}&endTime=${timerange[1]}`
+      )
+    }
+  }, [chartType, activityFetcher])
+
+  return (
+    <ActivityDataProvider
+      activityData={activityFetcher.data?.data || []}
+      sizeMetric="MOST_COMMITS"
+      selectedYear={activitySelectedYear}
+      setSelectedYear={setActivitySelectedYear}
+      selectedAuthor={activitySelectedAuthor}
+      setSelectedAuthor={setSelectedAuthor}
+      selectedDay={activitySelectedDay}
+      setSelectedDay={setSelectedDay}
+      showAllContributors={activityShowAllContributors}
+      setShowAllContributors={setShowAllContributors}
+    >
+      {children}
+    </ActivityDataProvider>
+  )
+}
+
 export default function Repo() {
   const client = useClient()
   const { dataPromise } = useLoaderData<typeof loader>()
@@ -389,6 +481,17 @@ export default function Repo() {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
   const [unionAuthorsModalOpen, setUnionAuthorsModalOpen] = useBoolean(false)
   const [hoveredObject, setHoveredObject] = useState<GitObject | null>(null)
+
+  const [activitySelectedYear, setActivitySelectedYear] = useState(new Date().getFullYear())
+  const [activitySelectedAuthor, setActivitySelectedAuthor] = useState("ALL")
+  const [activitySelectedDay, setActivitySelectedDay] = useState<string | null>(null)
+  const [activityShowAllContributors, setActivityShowAllContributors] = useState(false)
+
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
   const showUnionAuthorsModal = (): void => setUnionAuthorsModalOpen(true)
 
   const containerClass = useMemo(
@@ -428,94 +531,111 @@ export default function Repo() {
       <Await resolve={dataPromise}>
         {(dataPromise) => (
           <Providers data={dataPromise as RepoData}>
-            <div className={cn("app-container", containerClass)}>
-              <aside
-                className={clsx("grid auto-rows-min items-start gap-2 p-2 pr-0", {
-                  "overflow-y-auto": !isFullscreen
-                })}
+            {isClient && (
+              <ClientSideActivityProvider
+                dataPromise={dataPromise}
+                activitySelectedYear={activitySelectedYear}
+                setActivitySelectedYear={setActivitySelectedYear}
+                activitySelectedAuthor={activitySelectedAuthor}
+                setSelectedAuthor={setActivitySelectedAuthor}
+                activitySelectedDay={activitySelectedDay}
+                setSelectedDay={setActivitySelectedDay}
+                activityShowAllContributors={activityShowAllContributors}
+                setShowAllContributors={setActivityShowAllContributors}
               >
-                {!isLeftPanelCollapse ? (
-                  <>
-                    <GlobalInfo />
-                    <Options />
-                    <Legend hoveredObject={hoveredObject} showUnionAuthorsModal={showUnionAuthorsModal} />
-                    <MetricsCard />
-                  </>
-                ) : null}
-                {!isFullscreen ? (
-                  <div
-                    className={cn("absolute z-10 justify-self-end", {
-                      "left-0": isLeftPanelCollapse
+                <div className={cn("app-container", containerClass)}>
+                  <aside
+                    className={clsx("grid auto-rows-min items-start gap-2 p-2 pr-0", {
+                      "overflow-y-auto": !isFullscreen
                     })}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setIsLeftPanelCollapse(!isLeftPanelCollapse)}
-                      className={clsx(
-                        "btn btn--primary absolute left-0 top-[50vh] flex h-6 w-6 cursor-pointer items-center justify-center rounded-full p-0",
-                        {
-                          "left-arrow-space": !isLeftPanelCollapse
-                        }
-                      )}
-                    >
-                      <Icon path={isLeftPanelCollapse ? mdiChevronRight : mdiChevronLeft} size={1} />
-                    </button>
-                  </div>
-                ) : null}
-              </aside>
+                    {!isLeftPanelCollapse ? (
+                      <>
+                        <GlobalInfo />
+                        <Options />
+                        <Legend hoveredObject={hoveredObject} showUnionAuthorsModal={showUnionAuthorsModal} />
+                        <MetricsCard />
+                        {isClient && <ActivityFiltersPanel />}
+                      </>
+                    ) : null}
+                    {!isFullscreen ? (
+                      <div
+                        className={cn("absolute z-10 justify-self-end", {
+                          "left-0": isLeftPanelCollapse
+                        })}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setIsLeftPanelCollapse(!isLeftPanelCollapse)}
+                          className={clsx(
+                            "btn btn--primary absolute left-0 top-[50vh] flex h-6 w-6 cursor-pointer items-center justify-center p-0",
+                            {
+                              "left-arrow-space": !isLeftPanelCollapse
+                            }
+                          )}
+                        >
+                          <Icon path={isLeftPanelCollapse ? mdiChevronRight : mdiChevronLeft} size={1} />
+                        </button>
+                      </div>
+                    ) : null}
+                  </aside>
 
-              <main className="grid h-full min-w-[100px] grid-rows-[auto,1fr] gap-2 overflow-y-hidden p-2">
-                <header className="grid grid-flow-col items-center justify-between gap-2">
-                  <Breadcrumb />
-                  <FullscreenButton setIsFullscreen={setIsFullscreen} isFullscreen={isFullscreen} />
-                </header>
-                {client ? (
-                  <>
-                    <ChartWrapper hoveredObject={hoveredObject} setHoveredObject={setHoveredObject} />
-                    <div className="flex flex-col">
-                      <TimeSlider />
-                      <BarChart />
-                    </div>
-                  </>
-                ) : (
-                  <div />
-                )}
-              </main>
+                  <main className="grid h-full min-w-[100px] grid-rows-[auto,1fr] gap-2 overflow-y-hidden p-2">
+                    <header className="grid grid-flow-col items-center justify-between gap-2">
+                      <Breadcrumb />
+                      <FullscreenButton setIsFullscreen={setIsFullscreen} isFullscreen={isFullscreen} />
+                    </header>
+                    {client ? (
+                      <>
+                        <ChartWrapper hoveredObject={hoveredObject} setHoveredObject={setHoveredObject} />
+                        <div className="flex flex-col">
+                          <TimeSlider />
+                          <BarChart />
+                        </div>
+                      </>
+                    ) : (
+                      <div />
+                    )}
+                  </main>
 
-              <aside
-                className={clsx("grid auto-rows-min items-start gap-2 p-2 pl-0", {
-                  "overflow-y-auto": !isFullscreen
-                })}
-              >
-                {!isFullscreen ? (
-                  <div className="absolute">
-                    <button
-                      type="button"
-                      onClick={() => setIsRightPanelCollapse(!isRightPanelCollapse)}
-                      className="btn btn--primary absolute right-0 top-[50vh] flex h-6 w-6 cursor-pointer items-center justify-center rounded-full p-0"
-                    >
-                      <Icon path={isRightPanelCollapse ? mdiChevronLeft : mdiChevronRight} size={1} />
-                    </button>
-                  </div>
-                ) : null}
-                {!isRightPanelCollapse && !isFullscreen ? (
-                  <>
-                    <DetailsCard
-                      showUnionAuthorsModal={showUnionAuthorsModal}
-                      className={clsx({
-                        "absolute bottom-0 right-2 max-h-screen -translate-x-full overflow-y-auto shadow shadow-black/50":
-                          isFullscreen
-                      })}
-                    />
-                    {dataPromise.databaseInfo.hiddenFiles.length > 0 ? <HiddenFiles /> : null}
-                    <SearchCard />
-                    <Online>
-                      <FeedbackCard />
-                    </Online>
-                  </>
-                ) : null}
-              </aside>
-            </div>
+                  <aside
+                    className={clsx("grid auto-rows-min items-start gap-2 p-2 pl-0", {
+                      "overflow-y-auto": !isFullscreen
+                    })}
+                  >
+                    {!isFullscreen ? (
+                      <div className="absolute">
+                        <button
+                          type="button"
+                          onClick={() => setIsRightPanelCollapse(!isRightPanelCollapse)}
+                          className="btn btn--primary absolute right-0 top-[50vh] flex h-6 w-6 cursor-pointer items-center justify-center rounded-full p-0"
+                        >
+                          <Icon path={isRightPanelCollapse ? mdiChevronLeft : mdiChevronRight} size={1} />
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {!isRightPanelCollapse && !isFullscreen ? (
+                      <>
+                        <DetailsCard
+                          showUnionAuthorsModal={showUnionAuthorsModal}
+                          className={clsx({
+                            "absolute bottom-0 right-2 max-h-screen -translate-x-full overflow-y-auto shadow shadow-black/50":
+                              isFullscreen
+                          })}
+                        />
+                        {dataPromise.databaseInfo.hiddenFiles.length > 0 ? <HiddenFiles /> : null}
+                        <SearchCard />
+                        {isClient && <ActivityStatsPanel />}
+                        <Online>
+                          <FeedbackCard />
+                        </Online>
+                      </>
+                    ) : null}
+                  </aside>
+                </div>
+              </ClientSideActivityProvider>
+            )}
             <UnionAuthorsModal
               open={unionAuthorsModalOpen}
               onClose={() => {

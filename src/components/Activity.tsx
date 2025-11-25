@@ -1,10 +1,360 @@
-import { useRef, useEffect, useDeferredValue, useState, useCallback } from "react"
+import { useRef, useEffect, useDeferredValue, useState, useCallback, createContext, useContext } from "react"
 import * as d3 from "d3"
 import { useData } from "~/contexts/DataContext"
 import { useComponentSize } from "~/hooks"
 import type { GitTreeObject } from "~/analyzer/model"
 import { useFetcher } from "@remix-run/react"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
+
+interface ActivityContextType {
+  activityData: ActivityDataPoint[]
+  filteredActivityData: ActivityDataPoint[]
+  availableYears: number[]
+  authors: string[]
+  contributorRanks: Array<{ author: string; total: number; days: Array<{ day: string; value: number }> }>
+  metricLabel: string
+  sizeMetric: SizeMetricType
+  selectedYear: number
+  setSelectedYear: (year: number) => void
+  selectedAuthor: string
+  setSelectedAuthor: (author: string) => void
+  selectedDay: string | null
+  setSelectedDay: (day: string | null) => void
+  showAllContributors: boolean
+  setShowAllContributors: (show: boolean) => void
+}
+
+const ActivityContext = createContext<ActivityContextType | null>(null)
+
+export const useActivity = () => {
+  const context = useContext(ActivityContext)
+  if (!context) {
+    throw new Error("useActivity must be used within an ActivityProvider")
+  }
+  return context
+}
+
+export function ActivityDataProvider({
+  children,
+  activityData,
+  sizeMetric,
+  selectedYear,
+  setSelectedYear,
+  selectedAuthor,
+  setSelectedAuthor,
+  selectedDay,
+  setSelectedDay,
+  showAllContributors,
+  setShowAllContributors
+}: {
+  children: React.ReactNode
+  activityData: ActivityDataPoint[]
+  sizeMetric: SizeMetricType
+  selectedYear: number
+  setSelectedYear: (year: number) => void
+  selectedAuthor: string
+  setSelectedAuthor: (author: string) => void
+  selectedDay: string | null
+  setSelectedDay: (day: string | null) => void
+  showAllContributors: boolean
+  setShowAllContributors: (show: boolean) => void
+}) {
+  const [hideEmpty, setHideEmpty] = useState(false)
+
+  // Get available years from the data
+  const availableYears = Array.from(new Set(activityData.map((d) => new Date(d.date).getFullYear()))).sort(
+    (a, b) => b - a
+  )
+
+  // Default to current year or most recent year in data
+  const currentYear = new Date().getFullYear()
+  const defaultYear = availableYears.includes(currentYear) ? currentYear : availableYears[0] || currentYear
+
+  // Update selected year when data changes
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+      setSelectedYear(defaultYear)
+    }
+  }, [availableYears, selectedYear, defaultYear, setSelectedYear])
+
+  const authors = Array.from(new Set(activityData.map((d) => d.author))).sort()
+
+
+  const filteredActivityData: ActivityData = activityData.filter((d) => {
+    const date = new Date(d.date)
+    const matchesYear = selectedYear === 0 || date.getFullYear() === selectedYear
+    const matchesAuthor = selectedAuthor === "ALL" || d.author === selectedAuthor
+    return matchesYear && matchesAuthor && (!hideEmpty || d.commits > 0 || d.lineChanges > 0 || d.fileChanges > 0)
+  })
+
+  const getMetricValue = (d: ActivityDataPoint) => {
+    switch (sizeMetric) {
+      case "MOST_COMMITS":
+        return d.commits
+      case "MOST_CONTRIBS":
+        return d.lineChanges
+      case "FILE_SIZE":
+        return d.fileChanges
+      default:
+        return d.commits
+    }
+  }
+
+  const metricLabel =
+    sizeMetric === "MOST_COMMITS"
+      ? "Commits"
+      : sizeMetric === "MOST_CONTRIBS"
+        ? "Line changes"
+        : sizeMetric === "FILE_SIZE"
+          ? "File changes"
+          : "Commits"
+
+  let contributorRanks: Array<{ author: string; total: number; days: Array<{ day: string; value: number }> }> = []
+
+  if (selectedAuthor === "ALL") {
+    const authorGroups = d3.group(activityData, (d) => d.author)
+    contributorRanks = Array.from(authorGroups, ([author, entries]) => {
+      const total = d3.sum(entries, getMetricValue)
+      const days = entries.map((d) => ({ day: d.date, value: getMetricValue(d) })).sort((a, b) => b.value - a.value)
+      return { author, total, days }
+    })
+    contributorRanks.sort((a, b) => b.total - a.total)
+  }
+
+  const contextValue: ActivityContextType = {
+    activityData,
+    filteredActivityData,
+    availableYears,
+    authors,
+    contributorRanks,
+    metricLabel,
+    sizeMetric,
+    selectedYear,
+    setSelectedYear,
+    selectedAuthor,
+    setSelectedAuthor,
+    selectedDay,
+    setSelectedDay,
+    showAllContributors,
+    setShowAllContributors
+  }
+
+  return <ActivityContext.Provider value={contextValue}>{children}</ActivityContext.Provider>
+}
+
+export function ActivityFiltersPanel() {
+  const {
+    availableYears,
+    authors,
+    activityData,
+    sizeMetric,
+    selectedYear,
+    setSelectedYear,
+    selectedAuthor,
+    setSelectedAuthor,
+    selectedDay,
+    setSelectedDay
+  } = useActivity()
+  return (
+    <div className="card">
+      {/* Filters Section */}
+      <div className="mb-4 space-y-3 border-b pb-4">
+        <h3 className="font-semibold text-gray-800">Filters</h3>
+
+        {/* Year selector */}
+        {availableYears.length > 1 && (
+          <div>
+            <label htmlFor="year-select" className="mb-1 block text-xs font-medium text-gray-700">
+              Year
+            </label>
+            <select
+              id="year-select"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+            >
+              {availableYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Select for author */}
+        {authors.length > 0 && (
+          <div>
+            <label htmlFor="author-select" className="mb-1 block text-xs font-medium text-gray-700">
+              Author
+            </label>
+            <select
+              id="author-select"
+              value={selectedAuthor}
+              onChange={(e) => setSelectedAuthor(e.target.value)}
+              className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+            >
+              <option value="ALL">All</option>
+              {authors.map((author) => (
+                <option key={author} value={author}>
+                  {author}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* Day Details Section */}
+      {selectedDay ? (
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-semibold text-gray-800">Day Details</h3>
+            <button
+              onClick={() => setSelectedDay(null)}
+              className="text-gray-400 hover:text-gray-600"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+
+          {(() => {
+            const date = new Date(selectedDay)
+            const dayData = activityData.filter((d) => d.date === selectedDay)
+
+            if (dayData.length === 0) {
+              return <p className="text-gray-500">No activity on this day</p>
+            }
+
+            const totalCommits = d3.sum(dayData, (d) => d.commits)
+            const totalLineChanges = d3.sum(dayData, (d) => d.lineChanges)
+            const totalFileChanges = d3.sum(dayData, (d) => d.fileChanges)
+            const dayAuthors = Array.from(new Set(dayData.map((d) => d.author)))
+
+            return (
+              <div className="space-y-3">
+                {/* Date */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700">
+                    {date.toLocaleDateString("en-US", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric"
+                    })}
+                  </p>
+                </div>
+
+                {/* Metrics Summary */}
+                <div className="rounded bg-gray-50 p-2">
+                  <p className="mb-1 text-xs font-semibold uppercase text-gray-600">Summary</p>
+                  <div className="space-y-1 text-xs">
+                    <p className={sizeMetric === "MOST_COMMITS" ? "font-semibold text-blue-600" : ""}>
+                      <span className="text-gray-600">Commits:</span> {totalCommits}
+                    </p>
+                    <p className={sizeMetric === "MOST_CONTRIBS" ? "font-semibold text-blue-600" : ""}>
+                      <span className="text-gray-600">Line changes:</span> {totalLineChanges.toLocaleString()}
+                    </p>
+                    <p className={sizeMetric === "FILE_SIZE" ? "font-semibold text-blue-600" : ""}>
+                      <span className="text-gray-600">Files changed:</span> {totalFileChanges}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Authors */}
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase text-gray-600">
+                    Contributors ({dayAuthors.length})
+                  </p>
+                  <div className="space-y-2">
+                    {dayData.map((d, idx) => (
+                      <div key={idx} className="rounded border border-gray-200 p-2">
+                        <p className="mb-1 text-xs font-medium text-gray-700">{d.author}</p>
+                        <div className="space-y-0.5 text-xs text-gray-600">
+                          <p>Commits: {d.commits}</p>
+                          <p>Lines: {d.lineChanges.toLocaleString()}</p>
+                          <p>Files: {d.fileChanges}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+      ) : (
+        <div className="text-center text-gray-500">
+          <p className="text-xs">Click on a day to view details</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function ActivityStatsPanel() {
+  const {
+    filteredActivityData,
+    contributorRanks,
+    metricLabel,
+    selectedAuthor,
+    showAllContributors,
+    setShowAllContributors
+  } = useActivity()
+  return (
+    <div className="card">
+      <p>
+        <strong>Total days:</strong> {filteredActivityData.length}
+      </p>
+      <p>
+        <strong>Total commits:</strong> {d3.sum(filteredActivityData, (d) => d.commits)}
+      </p>
+      <p>
+        <strong>Total line changes:</strong> {d3.sum(filteredActivityData, (d) => d.lineChanges)}
+      </p>
+      <p>
+        <strong>Total file changes:</strong> {d3.sum(filteredActivityData, (d) => d.fileChanges)}
+      </p>
+
+      {/* Top contributors and top weeks */}
+      {selectedAuthor === "ALL" && contributorRanks.length > 0 && (
+        <div className="mt-4">
+          <h3 className="mb-2 font-semibold text-gray-700">Top Contributors - {metricLabel}</h3>
+          <div className="space-y-3">
+            {contributorRanks.slice(0, showAllContributors ? contributorRanks.length : 5).map((c, index) => (
+              <div key={c.author} className="rounded-lg border border-gray-200 bg-gray-50 p-3 shadow-sm">
+                <div className="mb-2">
+                  <span className="font-medium text-gray-800">
+                    {index + 1}. {c.author}
+                  </span>
+                  <div className="text-sm text-gray-600">Total: {c.total.toLocaleString()}</div>
+                </div>
+                <ul className="ml-4 list-inside list-disc space-y-1 text-xs">
+                  {c.days.slice(0, 3).map((d, i) => (
+                    <li key={i} className="text-gray-700">
+                      {d.day}: <span className="font-medium">{d.value.toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          {/* Show More/Less button */}
+          {contributorRanks.length > 5 && (
+            <button
+              onClick={() => setShowAllContributors(!showAllContributors)}
+              className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {showAllContributors ? `Show Less` : `Show All (${contributorRanks.length} contributors)`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 type ActivityFetcherData = {
   data: ActivityDataPoint[]
@@ -27,13 +377,15 @@ interface ActivityProps {
   sizeMetric: SizeMetricType
 }
 
-const Activity = ({ filetree, sizeMetric }: ActivityProps) => {
+const Activity = ({ filetree, sizeMetric }: Pick<ActivityProps, "filetree" | "sizeMetric">) => {
   const svgRef = useRef<SVGSVGElement>(null)
   const { databaseInfo, repo } = useData()
   const [ref, rawSize] = useComponentSize()
   const size = useDeferredValue(rawSize)
   const fetcher = useFetcher<ActivityFetcherData>()
   const [visible, setVisible] = useState(false)
+
+  const { selectedYear, selectedAuthor, selectedDay, setSelectedDay } = useActivity()
   // Immediately disable animations on mount
   useEffect(() => {
     const style = document.createElement("style")
@@ -58,27 +410,12 @@ const Activity = ({ filetree, sizeMetric }: ActivityProps) => {
   const [activityData, setActivityData] = useState<ActivityData>([])
   const [allDays, setAllDays] = useState<string[]>([])
 
-  const [selectedAuthor, setSelectedAuthor] = useState("ALL")
   const [hideEmpty, setHideEmpty] = useState(false)
-  const [selectedDay, setSelectedDay] = useState<string | null>(null)
-  const [showAllContributors, setShowAllContributors] = useState(false)
 
   // Get available years from the data
   const availableYears = Array.from(new Set(activityData.map((d) => new Date(d.date).getFullYear()))).sort(
     (a, b) => b - a
   )
-
-  // Default to current year or most recent year in data
-  const currentYear = new Date().getFullYear()
-  const defaultYear = availableYears.includes(currentYear) ? currentYear : availableYears[0]
-  const [selectedYear, setSelectedYear] = useState<number>(defaultYear)
-
-  // Update selected year when data changes
-  useEffect(() => {
-    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
-      setSelectedYear(defaultYear)
-    }
-  }, [availableYears, selectedYear, defaultYear])
 
   const authors = Array.from(new Set(activityData.map((d) => d.author))).sort()
   console.log("AUTHORS:", authors)
@@ -99,7 +436,7 @@ const Activity = ({ filetree, sizeMetric }: ActivityProps) => {
     [sizeMetric]
   )
 
-  // Get metric label for display
+
   const metricLabel =
     sizeMetric === "MOST_COMMITS" ? "Commits" : sizeMetric === "MOST_CONTRIBS" ? "Line changes" : "File changes"
 
@@ -115,7 +452,7 @@ const Activity = ({ filetree, sizeMetric }: ActivityProps) => {
     setSelectedDay(null)
   }, [databaseInfo.selectedRange, repo.name, databaseInfo.branch])
 
-  // set activity data
+
   useEffect(() => {
     if (fetcher.data) {
       setActivityData(fetcher.data.data)
@@ -123,7 +460,7 @@ const Activity = ({ filetree, sizeMetric }: ActivityProps) => {
     }
   }, [fetcher.data])
 
-  // Filter data by selected year and author
+
   const filteredActivityData: ActivityData = activityData
     .filter((d) => {
       const year = new Date(d.date).getFullYear()
@@ -135,7 +472,7 @@ const Activity = ({ filetree, sizeMetric }: ActivityProps) => {
       // Group by date
       const existing = acc.find((item) => item.date === d.date)
       if (existing) {
-        // Aggregate metrics for this day
+
         existing.commits += d.commits
         existing.lineChanges += d.lineChanges
         existing.fileChanges += d.fileChanges
@@ -554,152 +891,13 @@ const Activity = ({ filetree, sizeMetric }: ActivityProps) => {
       .style("animation", "none")
   }, [filteredActivityData, size, sizeMetric, selectedYear, selectedDay, getMetricValue, metricLabel])
 
-  // Render left panel with filters
-  const renderLeftPanel = () => (
-    <div className="w-64 flex-shrink-0 overflow-y-auto rounded-lg border bg-white px-4 py-3 text-sm shadow-sm">
-      {/* Filters Section */}
-      <div className="mb-4 space-y-3 border-b pb-4">
-        <h3 className="font-semibold text-gray-800">Filters</h3>
-
-        {/* Year selector */}
-        {availableYears.length > 1 && (
-          <div>
-            <label htmlFor="year-select" className="mb-1 block text-xs font-medium text-gray-700">
-              Year
-            </label>
-            <select
-              id="year-select"
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
-            >
-              {availableYears.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Select for author */}
-        {authors.length > 0 && (
-          <div>
-            <label htmlFor="author-select" className="mb-1 block text-xs font-medium text-gray-700">
-              Author
-            </label>
-            <select
-              id="author-select"
-              value={selectedAuthor}
-              onChange={(e) => setSelectedAuthor(e.target.value)}
-              className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
-            >
-              <option value="ALL">All</option>
-              {authors.map((author) => (
-                <option key={author} value={author}>
-                  {author}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-
-      {/* Day Details Section */}
-      {selectedDay ? (
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold text-gray-800">Day Details</h3>
-            <button
-              onClick={() => setSelectedDay(null)}
-              className="text-gray-400 hover:text-gray-600"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
-
-          {(() => {
-            const date = new Date(selectedDay)
-            const dayData = activityData.filter((d) => d.date === selectedDay)
-
-            if (dayData.length === 0) {
-              return <p className="text-gray-500">No activity on this day</p>
-            }
-
-            const totalCommits = d3.sum(dayData, (d) => d.commits)
-            const totalLineChanges = d3.sum(dayData, (d) => d.lineChanges)
-            const totalFileChanges = d3.sum(dayData, (d) => d.fileChanges)
-            const dayAuthors = Array.from(new Set(dayData.map((d) => d.author)))
-
-            return (
-              <div className="space-y-3">
-                {/* Date */}
-                <div>
-                  <p className="text-sm font-medium text-gray-700">
-                    {date.toLocaleDateString("en-US", {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric"
-                    })}
-                  </p>
-                </div>
-
-                {/* Metrics Summary */}
-                <div className="rounded bg-gray-50 p-2">
-                  <p className="mb-1 text-xs font-semibold uppercase text-gray-600">Summary</p>
-                  <div className="space-y-1 text-xs">
-                    <p className={sizeMetric === "MOST_COMMITS" ? "font-semibold text-blue-600" : ""}>
-                      <span className="text-gray-600">Commits:</span> {totalCommits}
-                    </p>
-                    <p className={sizeMetric === "MOST_CONTRIBS" ? "font-semibold text-blue-600" : ""}>
-                      <span className="text-gray-600">Line changes:</span> {totalLineChanges.toLocaleString()}
-                    </p>
-                    <p className={sizeMetric === "FILE_SIZE" ? "font-semibold text-blue-600" : ""}>
-                      <span className="text-gray-600">Files changed:</span> {totalFileChanges}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Authors */}
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase text-gray-600">
-                    Contributors ({dayAuthors.length})
-                  </p>
-                  <div className="space-y-2">
-                    {dayData.map((d, idx) => (
-                      <div key={idx} className="rounded border border-gray-200 p-2">
-                        <p className="mb-1 text-xs font-medium text-gray-700">{d.author}</p>
-                        <div className="space-y-0.5 text-xs text-gray-600">
-                          <p>Commits: {d.commits}</p>
-                          <p>Lines: {d.lineChanges.toLocaleString()}</p>
-                          <p>Files: {d.fileChanges}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
-        </div>
-      ) : (
-        <div className="text-center text-gray-500">
-          <p className="text-xs">Click on a day to view details</p>
-        </div>
-      )}
-    </div>
-  )
-
   if (fetcher.state === "loading") {
     return (
       <div
         ref={ref}
-        className="activity-container flex h-full w-full gap-4 overflow-hidden p-4"
+        className="activity-container flex h-full w-full overflow-hidden"
         style={{ opacity: visible ? 1 : 0 }}
       >
-        {renderLeftPanel()}
         <div className="flex flex-1 items-center justify-center">
           <p>Loading activity data...</p>
         </div>
@@ -711,10 +909,9 @@ const Activity = ({ filetree, sizeMetric }: ActivityProps) => {
     return (
       <div
         ref={ref}
-        className="activity-container flex h-full w-full gap-4 overflow-hidden p-4"
+        className="activity-container flex h-full w-full overflow-hidden"
         style={{ opacity: visible ? 1 : 0 }}
       >
-        {renderLeftPanel()}
         <div className="flex flex-1 items-center justify-center">
           <p>No data available for activity view</p>
         </div>
@@ -725,68 +922,15 @@ const Activity = ({ filetree, sizeMetric }: ActivityProps) => {
   return (
     <div
       ref={ref}
-      className="activity-container flex h-full w-full gap-4 overflow-hidden p-4"
+      className="activity-container relative h-full w-full overflow-hidden"
       style={{ opacity: visible ? 1 : 0 }}
     >
-      {renderLeftPanel()}
-
       {/* activity */}
-      <div className="flex-1">
-        <svg ref={svgRef} className="h-full w-full" style={{ maxHeight: "100vh", display: "block" }}></svg>
-      </div>
-
-      {/* info box */}
-      <div className="w-64 flex-shrink-0 overflow-y-auto rounded-lg border bg-gray-50 px-4 py-2 text-sm shadow-sm">
-        <p>
-          <strong>Total days:</strong> {filteredActivityData.length}
-        </p>
-        <p>
-          <strong>Total commits:</strong> {d3.sum(filteredActivityData, (d) => d.commits)}
-        </p>
-        <p>
-          <strong>Total line changes:</strong> {d3.sum(filteredActivityData, (d) => d.lineChanges)}
-        </p>
-        <p>
-          <strong>Total file changes:</strong> {d3.sum(filteredActivityData, (d) => d.fileChanges)}
-        </p>
-
-        {/* show top contributors and their top weeks */}
-        {/* Top contributors & top weeks */}
-        {selectedAuthor === "ALL" && contributorRanks.length > 0 && (
-          <div className="mt-4">
-            <h3 className="mb-2 font-semibold text-gray-700">Top Contributors - {metricLabel}</h3>
-            <div className="space-y-3">
-              {contributorRanks.slice(0, showAllContributors ? contributorRanks.length : 5).map((c, index) => (
-                <div key={c.author} className="rounded-lg border border-gray-200 bg-gray-50 p-3 shadow-sm">
-                  <div className="mb-2">
-                    <span className="font-medium text-gray-800">
-                      {index + 1}. {c.author}
-                    </span>
-                    <div className="text-sm text-gray-600">Total: {c.total.toLocaleString()}</div>
-                  </div>
-                  <ul className="ml-4 list-inside list-disc space-y-1 text-xs">
-                    {c.days.slice(0, 3).map((d, i) => (
-                      <li key={i} className="text-gray-700">
-                        {d.day}: <span className="font-medium">{d.value.toLocaleString()}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-
-            {/* Show More/Less button */}
-            {contributorRanks.length > 5 && (
-              <button
-                onClick={() => setShowAllContributors(!showAllContributors)}
-                className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                {showAllContributors ? `Show Less` : `Show All (${contributorRanks.length} contributors)`}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      <svg
+        ref={svgRef}
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transform"
+        style={{ maxHeight: "100vh", display: "block" }}
+      ></svg>
     </div>
   )
 }
