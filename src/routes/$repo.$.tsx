@@ -27,6 +27,7 @@ import { useFetcher } from "@remix-run/react"
 import { Icon } from "@mdi/react"
 import { useClient } from "~/hooks"
 import { useOptions } from "~/contexts/OptionsContext"
+
 import clsx from "clsx"
 import { Tooltip } from "~/components/Tooltip"
 import { createPortal } from "react-dom"
@@ -549,15 +550,15 @@ export default function Repo() {
                       "overflow-y-auto": !isFullscreen
                     })}
                   >
-                    {!isLeftPanelCollapse ? (
-                      <>
-                        <GlobalInfo />
-                        <Options />
-                        <Legend hoveredObject={hoveredObject} showUnionAuthorsModal={showUnionAuthorsModal} />
-                        <MetricsCard />
-                        {isClient && <ActivityFiltersPanel />}
-                      </>
-                    ) : null}
+                     {!isLeftPanelCollapse ? (
+                       <>
+                         <GlobalInfo />
+                         <Options />
+                         <Legend hoveredObject={hoveredObject} showUnionAuthorsModal={showUnionAuthorsModal} />
+                         <MetricsCard />
+                         {isClient && <ActivityFiltersPanelWrapper />}
+                       </>
+                     ) : null}
                     {!isFullscreen ? (
                       <div
                         className={cn("absolute z-10 justify-self-end", {
@@ -615,23 +616,23 @@ export default function Repo() {
                       </div>
                     ) : null}
 
-                    {!isRightPanelCollapse && !isFullscreen ? (
-                      <>
-                        <DetailsCard
-                          showUnionAuthorsModal={showUnionAuthorsModal}
-                          className={clsx({
-                            "absolute bottom-0 right-2 max-h-screen -translate-x-full overflow-y-auto shadow shadow-black/50":
-                              isFullscreen
-                          })}
-                        />
-                        {dataPromise.databaseInfo.hiddenFiles.length > 0 ? <HiddenFiles /> : null}
-                        <SearchCard />
-                        {isClient && <ActivityStatsPanel />}
-                        <Online>
-                          <FeedbackCard />
-                        </Online>
-                      </>
-                    ) : null}
+                     {!isRightPanelCollapse && !isFullscreen ? (
+                       <>
+                         <DetailsCard
+                           showUnionAuthorsModal={showUnionAuthorsModal}
+                           className={clsx({
+                             "absolute bottom-0 right-2 max-h-screen -translate-x-full overflow-y-auto shadow shadow-black/50":
+                               isFullscreen
+                           })}
+                         />
+                         {dataPromise.databaseInfo.hiddenFiles.length > 0 ? <HiddenFiles /> : null}
+                         <SearchCard />
+                         {isClient && <ActivityStatsPanelWrapper />}
+                         <Online>
+                           <FeedbackCard />
+                         </Online>
+                       </>
+                     ) : null}
                   </aside>
                 </div>
               </ClientSideActivityProvider>
@@ -648,6 +649,16 @@ export default function Repo() {
     </Suspense>
   )
 }
+
+const ActivityFiltersPanelWrapper = memo(function ActivityFiltersPanelWrapper() {
+  const options = useOptions()
+  return options.chartType === "ACTIVITY" ? <ActivityFiltersPanel /> : null
+})
+
+const ActivityStatsPanelWrapper = memo(function ActivityStatsPanelWrapper() {
+  const options = useOptions()
+  return options.chartType === "ACTIVITY" ? <ActivityStatsPanel /> : null
+})
 
 const FullscreenButton = memo(function FullscreenButton({
   setIsFullscreen,
