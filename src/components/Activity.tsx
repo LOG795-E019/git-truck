@@ -79,7 +79,6 @@ export function ActivityDataProvider({
 
   const authors = Array.from(new Set(activityData.map((d) => d.author))).sort()
 
-
   const filteredActivityData: ActivityData = activityData.filter((d) => {
     const date = new Date(d.date)
     const matchesYear = selectedYear === 0 || date.getFullYear() === selectedYear
@@ -436,7 +435,6 @@ const Activity = ({ filetree, sizeMetric }: Pick<ActivityProps, "filetree" | "si
     [sizeMetric]
   )
 
-
   const metricLabel =
     sizeMetric === "MOST_COMMITS" ? "Commits" : sizeMetric === "MOST_CONTRIBS" ? "Line changes" : "File changes"
 
@@ -452,14 +450,12 @@ const Activity = ({ filetree, sizeMetric }: Pick<ActivityProps, "filetree" | "si
     setSelectedDay(null)
   }, [databaseInfo.selectedRange, repo.name, databaseInfo.branch])
 
-
   useEffect(() => {
     if (fetcher.data) {
       setActivityData(fetcher.data.data)
       setAllDays(fetcher.data.days)
     }
   }, [fetcher.data])
-
 
   const filteredActivityData: ActivityData = activityData
     .filter((d) => {
@@ -472,7 +468,6 @@ const Activity = ({ filetree, sizeMetric }: Pick<ActivityProps, "filetree" | "si
       // Group by date
       const existing = acc.find((item) => item.date === d.date)
       if (existing) {
-
         existing.commits += d.commits
         existing.lineChanges += d.lineChanges
         existing.fileChanges += d.fileChanges

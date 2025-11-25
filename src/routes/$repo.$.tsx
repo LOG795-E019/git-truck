@@ -23,6 +23,7 @@ import { Breadcrumb } from "~/components/Breadcrumb"
 import { FeedbackCard } from "~/components/FeedbackCard"
 import { Chart } from "~/components/Chart"
 import { ActivityFiltersPanel, ActivityStatsPanel, ActivityDataProvider } from "~/components/Activity"
+import { HeatmapPanel } from "~/components/HeatmapPanel"
 import { useFetcher } from "@remix-run/react"
 import { Icon } from "@mdi/react"
 import { useClient } from "~/hooks"
@@ -410,6 +411,7 @@ function ClientSideActivityFetcher({ dataPromise }: { dataPromise: any }) {
 
   return null
 }
+
 function ClientSideActivityProvider({
   dataPromise,
   activitySelectedYear,
@@ -550,15 +552,16 @@ export default function Repo() {
                       "overflow-y-auto": !isFullscreen
                     })}
                   >
-                     {!isLeftPanelCollapse ? (
-                       <>
-                         <GlobalInfo />
-                         <Options />
-                         <Legend hoveredObject={hoveredObject} showUnionAuthorsModal={showUnionAuthorsModal} />
-                         <MetricsCard />
-                         {isClient && <ActivityFiltersPanelWrapper />}
-                       </>
-                     ) : null}
+                    {!isLeftPanelCollapse ? (
+                      <>
+                        <GlobalInfo />
+                        <Options />
+                        <Legend hoveredObject={hoveredObject} showUnionAuthorsModal={showUnionAuthorsModal} />
+                        <MetricsCard />
+                        {isClient && <ActivityFiltersPanelWrapper />}
+                        {isClient && <HeatmapPanelWrapper />}
+                      </>
+                    ) : null}
                     {!isFullscreen ? (
                       <div
                         className={cn("absolute z-10 justify-self-end", {
@@ -616,23 +619,23 @@ export default function Repo() {
                       </div>
                     ) : null}
 
-                     {!isRightPanelCollapse && !isFullscreen ? (
-                       <>
-                         <DetailsCard
-                           showUnionAuthorsModal={showUnionAuthorsModal}
-                           className={clsx({
-                             "absolute bottom-0 right-2 max-h-screen -translate-x-full overflow-y-auto shadow shadow-black/50":
-                               isFullscreen
-                           })}
-                         />
-                         {dataPromise.databaseInfo.hiddenFiles.length > 0 ? <HiddenFiles /> : null}
-                         <SearchCard />
-                         {isClient && <ActivityStatsPanelWrapper />}
-                         <Online>
-                           <FeedbackCard />
-                         </Online>
-                       </>
-                     ) : null}
+                    {!isRightPanelCollapse && !isFullscreen ? (
+                      <>
+                        <DetailsCard
+                          showUnionAuthorsModal={showUnionAuthorsModal}
+                          className={clsx({
+                            "absolute bottom-0 right-2 max-h-screen -translate-x-full overflow-y-auto shadow shadow-black/50":
+                              isFullscreen
+                          })}
+                        />
+                        {dataPromise.databaseInfo.hiddenFiles.length > 0 ? <HiddenFiles /> : null}
+                        <SearchCard />
+                        {isClient && <ActivityStatsPanelWrapper />}
+                        <Online>
+                          <FeedbackCard />
+                        </Online>
+                      </>
+                    ) : null}
                   </aside>
                 </div>
               </ClientSideActivityProvider>
@@ -658,6 +661,11 @@ const ActivityFiltersPanelWrapper = memo(function ActivityFiltersPanelWrapper() 
 const ActivityStatsPanelWrapper = memo(function ActivityStatsPanelWrapper() {
   const options = useOptions()
   return options.chartType === "ACTIVITY" ? <ActivityStatsPanel /> : null
+})
+
+const HeatmapPanelWrapper = memo(function HeatmapPanelWrapper() {
+  const options = useOptions()
+  return options.chartType === "HEAT_MAP" ? <HeatmapPanel /> : null
 })
 
 const FullscreenButton = memo(function FullscreenButton({

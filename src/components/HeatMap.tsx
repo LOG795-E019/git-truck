@@ -5,6 +5,7 @@ import { useComponentSize } from "~/hooks"
 import type { GitTreeObject } from "~/analyzer/model"
 import { useFetcher } from "@remix-run/react"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
+import { setHeatmapSelection } from "./HeatmapPanel"
 
 interface HeatmapProps {
   filetree: GitTreeObject
@@ -168,6 +169,16 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
       setMatrix(newMatrix)
     }
   }, [fetcher.data, sizeMetric])
+
+  // Update global heatmap selection state
+  useEffect(() => {
+    setHeatmapSelection({
+      selectedLabel,
+      collaborationsMap,
+      sizeMetric,
+      metricLabel
+    })
+  }, [selectedLabel, collaborationsMap, sizeMetric, metricLabel])
 
   useEffect(() => {
     if (!svgRef.current || !visible || authors.length === 0 || matrix.length === 0) {
@@ -406,8 +417,7 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
   }
 
   return (
-    <div className="flex h-full w-full gap-4 overflow-hidden p-4">
-      {renderLeftPanel()} {/* Left panel on the left */}
+    <div className="flex h-full w-full overflow-hidden p-4">
       <div className="flex-1">
         <svg ref={svgRef} className="h-full w-full" style={{ maxHeight: "100vh", display: "block" }}></svg>
       </div>
