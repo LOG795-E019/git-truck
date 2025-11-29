@@ -6,6 +6,7 @@ import type { GitTreeObject } from "~/analyzer/model"
 import { useFetcher } from "@remix-run/react"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { setHeatmapSelection } from "./HeatmapPanel"
+import { useOptions } from "../contexts/OptionsContext"
 
 interface HeatmapProps {
   filetree: GitTreeObject
@@ -28,6 +29,9 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
   const size = useDeferredValue(rawSize)
   const fetcher = useFetcher<HeatmapFetcherData>()
   const [visible, setVisible] = useState(false)
+
+  // Heatmap options sliders
+  const { minFilesChanged, maxContributors } = useOptions()
 
   useEffect(() => {
     const style = document.createElement("style")
@@ -128,47 +132,98 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
     fetcher.load(`/heatmap?${params}`)
   }, [databaseInfo.selectedRange, repo.name, databaseInfo.branch, sizeMetric])
 
-  // useEffect(() => {
-  //   if (fetcher.data) {
-  //     setAuthors(fetcher.data.authors)
-  //     setMatrix(fetcher.data.matrix)
-  //     setCollaborationsMap(fetcher.data.collaborationsMap)
-  //   }
-  // }, [fetcher.data])
-
   useEffect(() => {
-    if (fetcher.data) {
-      setAuthors(fetcher.data.authors)
-      setCollaborationsMap(fetcher.data.collaborationsMap)
+    if (!fetcher.data) return
 
-      // Build a matrix by summing all files per author pair
-      const newMatrix: number[][] = fetcher.data.authors.map((a1, i) =>
-        fetcher.data.authors.map((a2, j) => {
-          if (i === j) return 0 // diagonal
+    const { authors: allAuthors, collaborationsMap } = fetcher.data
 
-          const key1 = `${a1} - ${a2}`
-          const key2 = `${a2} - ${a1}`
+    // setUp author file count
+    const authorFilesCount: Record<string, Set<string>> = {}
+    allAuthors.forEach((author) => {
+      authorFilesCount[author] = new Set()
+    })
 
-          const files = fetcher.data.collaborationsMap[key1] ?? fetcher.data.collaborationsMap[key2] ?? []
+    // process the total file count per author
+    Object.entries(collaborationsMap).forEach(([key, files]) => {
+      const [a1, a2] = key.split(" - ")
+      files.forEach((f) => {
+        authorFilesCount[a1]?.add(f.file)
+        authorFilesCount[a2]?.add(f.file)
+      })
+    })
 
-          return files.reduce((sum, f) => {
-            switch (sizeMetric) {
-              case "MOST_COMMITS":
-                return sum + f.totalCommits
-              case "MOST_CONTRIBS":
-                return sum + f.totalLineChanges
-              case "FILE_SIZE":
-                return sum + f.sharedFiles
-              default:
-                return sum
-            }
-          }, 0)
-        })
-      )
+    // filter authors by minFilesChanged
+    const eligibleAuthors = allAuthors.filter((author) => (authorFilesCount[author]?.size ?? 0) >= minFilesChanged)
 
-      setMatrix(newMatrix)
-    }
-  }, [fetcher.data, sizeMetric])
+    // adds up the values depending on the current metric
+    const authorActivity: Record<string, number> = {}
+    eligibleAuthors.forEach((author) => (authorActivity[author] = 0))
+
+    Object.entries(collaborationsMap).forEach(([key, files]) => {
+      const [a1, a2] = key.split(" - ")
+      if (!eligibleAuthors.includes(a1) || !eligibleAuthors.includes(a2)) return
+
+      const value = files.reduce((sum, f) => {
+        switch (sizeMetric) {
+          case "MOST_COMMITS":
+            return sum + f.totalCommits
+          case "MOST_CONTRIBS":
+            return sum + f.totalLineChanges
+          case "FILE_SIZE":
+            return sum + f.sharedFiles
+          default:
+            return sum
+        }
+      }, 0)
+
+      authorActivity[a1] += value
+      authorActivity[a2] += value
+    })
+
+    // limit number of authors by maxContributors
+    const activeAuthors = Object.entries(authorActivity)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, maxContributors)
+      .map(([author]) => author)
+
+    setAuthors(activeAuthors)
+
+    // Heatmap matrix (active authors only)
+    const newMatrix = activeAuthors.map((a1) =>
+      activeAuthors.map((a2) => {
+        if (a1 === a2) return 0
+
+        const key1 = `${a1} - ${a2}`
+        const key2 = `${a2} - ${a1}`
+        const files = collaborationsMap[key1] ?? collaborationsMap[key2] ?? []
+
+        return files.reduce((sum, f) => {
+          switch (sizeMetric) {
+            case "MOST_COMMITS":
+              return sum + f.totalCommits
+            case "MOST_CONTRIBS":
+              return sum + f.totalLineChanges
+            case "FILE_SIZE":
+              return sum + f.sharedFiles
+            default:
+              return sum
+          }
+        }, 0)
+      })
+    )
+
+    // only show collaborators if both are active
+    const filteredPairs: Record<string, (typeof collaborationsMap)[string]> = {}
+    Object.entries(collaborationsMap).forEach(([key, files]) => {
+      const [a1, a2] = key.split(" - ")
+      if (activeAuthors.includes(a1) && activeAuthors.includes(a2)) {
+        filteredPairs[key] = files
+      }
+    })
+
+    setMatrix(newMatrix)
+    setCollaborationsMap(filteredPairs)
+  }, [fetcher.data, sizeMetric, minFilesChanged, maxContributors])
 
   // Update global heatmap selection state
   useEffect(() => {

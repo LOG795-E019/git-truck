@@ -75,6 +75,9 @@ export const Options = memo(function Options() {
   const authorInitializedRef = useRef(false)
   const filesInitializedRef = useRef(false)
 
+  // Heatmap options sliders
+  const { minFilesChanged, setMinFilesChanged, maxContributors, setMaxContributors } = useOptions()
+
   // Get all authors and files from database
   const allAuthors = Object.keys(databaseInfo?.authorsTotalStats || {})
   const allFiles = useMemo(() => {
@@ -774,6 +777,49 @@ export const Options = memo(function Options() {
               )}
             </fieldset>
           </>
+        )}
+
+        {chartType === "HEAT_MAP" && (
+          <fieldset className="mt-2 rounded-lg border p-2">
+            <legend className="card__title ml-1.5 justify-start gap-2">
+              <Icon path={mdiGrid} size="1.25em" />
+              Heatmap Filters
+            </legend>
+
+            <div className="mt-2 flex flex-col gap-4">
+              {/* Minimum files changed */}
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">Minimum files changed</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={1}
+                    max={50}
+                    value={minFilesChanged}
+                    onChange={(e) => setMinFilesChanged(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <span className="w-12 text-right text-xs text-gray-500">{minFilesChanged}</span>
+                </div>
+              </div>
+
+              {/* Maximum users */}
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">Maximum contributors (sorted by metric)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={1}
+                    max={30}
+                    value={maxContributors}
+                    onChange={(e) => setMaxContributors(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <span className="w-12 text-right text-xs text-gray-500">{maxContributors}</span>
+                </div>
+              </div>
+            </div>
+          </fieldset>
         )}
       </div>
 

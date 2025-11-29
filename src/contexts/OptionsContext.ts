@@ -69,6 +69,8 @@ export type Options = {
   fileGroups: FileGroup[]
   selectedFilePaths: string[] // Keep this for individual files
   fileAuthorMode: "groups" | "individual" // Add this new property
+  minFilesChanged: number
+  maxContributors: number
 }
 
 export type OptionsContextType = Options & {
@@ -95,6 +97,8 @@ export type OptionsContextType = Options & {
   setSelectedFilePaths: (filePaths: string[]) => void // Updated setter
   setFileGroups: (fileGroups: FileGroup[]) => void // Add this line
   setFileAuthorMode: (mode: "groups" | "individual") => void // Add this line
+  setMinFilesChanged: (value: number) => void
+  setMaxContributors: (value: number) => void
 }
 
 export const OptionsContext = createContext<OptionsContextType | undefined>(undefined)
@@ -131,7 +135,9 @@ const defaultOptions: Options = {
   selectedFiles: [],
   fileGroups: [],
   selectedFilePaths: [],
-  fileAuthorMode: "individual" // Default to individual mode
+  fileAuthorMode: "individual", // Default to individual mode
+  minFilesChanged: 1,
+  maxContributors: 15
 }
 
 export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {}): OptionsContextType {
@@ -206,6 +212,12 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setFileAuthorMode: () => {
       throw new Error("No setFileAuthorModeSetter provided")
+    },
+    setMinFilesChanged: () => {
+      throw new Error("No setMinFilesChangedSetter provided")
+    },
+    setMaxContributors: () => {
+      throw new Error("No setMaxContributorsSetter provided")
     }
   }
 }

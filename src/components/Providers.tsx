@@ -210,6 +210,16 @@ export function Providers({ children, data }: ProvidersProps) {
         setOptions((prevOptions) => ({
           ...(prevOptions ?? getDefaultOptionsContextValue()),
           fileAuthorMode: mode
+        })),
+      setMinFilesChanged: (minFilesChanged: number) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          minFilesChanged: minFilesChanged
+        })),
+      setMaxContributors: (maxContributors: number) =>
+        setOptions((prevOptions) => ({
+          ...(prevOptions ?? getDefaultOptionsContextValue()),
+          maxContributors: maxContributors
         }))
     }),
     [options, submit]
