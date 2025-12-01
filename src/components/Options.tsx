@@ -37,7 +37,6 @@ import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
 import type { GroupingType } from "~/metrics/grouping"
 import { Grouping } from "~/metrics/grouping"
-import Slider from '@mui/material/Slider';
 
 export const relatedSizeMetric: Record<MetricType, SizeMetricType> = {
   FILE_TYPE: "FILE_SIZE",
@@ -102,9 +101,7 @@ export const Options = memo(function Options() {
   }, [allAuthors, selectedAuthors, setSelectedAuthors])
 
   useEffect(() => {
-    if (
-      cohesionRatio === undefined  
-    ) {
+    if (cohesionRatio === undefined) {
       setCohesionRatio(60)
     }
   }, [cohesionRatio, setCohesionRatio])
@@ -233,8 +230,8 @@ export const Options = memo(function Options() {
     JSON_RULES: mdiTextBox,
     AUTHOR_FILES: mdiAccountMultiple,
     FILE_AUTHORS: mdiAccountNetwork,
-    DEFAULT:mdiAccount,
-    COMMUNITY:mdiAccountSupervisorCircle,
+    DEFAULT: mdiAccount,
+    COMMUNITY: mdiAccountSupervisorCircle
   }
 
   const chartTypeIcons: Record<ChartType, string> = {
@@ -249,18 +246,14 @@ export const Options = memo(function Options() {
   // exclude DEFAULT and COMMUNITY. Use strict equality checks.
   const groupingOptions = useMemo(() => {
     if (chartType === "AUTHOR_GRAPH") {
-      return (
-        Object.fromEntries(
-          Object.entries(Grouping).filter(([key]) => key === "DEFAULT" || key === "COMMUNITY")
-        ) as Record<GroupingType, string>
-      )
+      return Object.fromEntries(
+        Object.entries(Grouping).filter(([key]) => key === "DEFAULT" || key === "COMMUNITY")
+      ) as Record<GroupingType, string>
     }
 
-    return (
-      Object.fromEntries(
-        Object.entries(Grouping).filter(([key]) => key !== "DEFAULT" && key !== "COMMUNITY")
-      ) as Record<GroupingType, string>
-    )
+    return Object.fromEntries(
+      Object.entries(Grouping).filter(([key]) => key !== "DEFAULT" && key !== "COMMUNITY")
+    ) as Record<GroupingType, string>
   }, [chartType])
 
   // Buttons Behaviors
@@ -353,10 +346,10 @@ export const Options = memo(function Options() {
             enum={
               chartType === "AUTHOR_GRAPH"
                 ? ({
-                      MOST_COMMITS: SizeMetric.MOST_COMMITS,
-                      MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
-                      FILE_SIZE: "Shared files"
-                    } as Record<SizeMetricType, string>)
+                    MOST_COMMITS: SizeMetric.MOST_COMMITS,
+                    MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
+                    FILE_SIZE: "Shared files"
+                  } as Record<SizeMetricType, string>)
                 : chartType === "ACTIVITY"
                   ? ({
                       MOST_COMMITS: SizeMetric.MOST_COMMITS,
@@ -715,22 +708,6 @@ export const Options = memo(function Options() {
                         />
                       </div>
                     </div>
-                    <div className="flex flex-col">
-                      <label htmlFor="line-changes-min" className="text-xs font-medium">
-                        Cohesion
-                      </label>
-                      <div className="flex items-center gap-1 w-full">
-                          <Slider defaultValue={50} aria-label="Default" valueLabelDisplay="auto" sx={{ width: 100, color: 'success.main' }}
-                            value={cohesionRatio} 
-                            onChange={(e, newValue) =>{e.stopPropagation();setCohesionRatio(newValue);}}
-                            step={10}
-                            marks
-                            min={10}
-                            max={90}
-                          />
-                          
-                      </div>
-                    </div>
                   </div>
 
                   {/* Reset filters button */}
@@ -829,6 +806,39 @@ export const Options = memo(function Options() {
               )}
             </fieldset>
           </>
+        )}
+
+        {chartType === "AUTHOR_GRAPH" && (
+          <fieldset className="mt-2 rounded-lg border p-2">
+            <legend className="card__title ml-1.5 justify-start gap-2">
+              <Icon path={mdiGrid} size="1.25em" />
+              Author Graph Filter
+            </legend>
+
+            <div className="mt-2 flex flex-col gap-4">
+              {/* Minimum files changed */}
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">
+                  Cohesion (minimum % of shared work between contributors)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={10}
+                    max={90}
+                    step={10}
+                    value={cohesionRatio}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      setCohesionRatio(Number(e.target.value))
+                    }}
+                    className="flex-1"
+                  />
+                  <span className="w-12 text-right text-xs text-gray-500">{cohesionRatio}</span>
+                </div>
+              </div>
+            </div>
+          </fieldset>
         )}
 
         {chartType === "HEAT_MAP" && (
