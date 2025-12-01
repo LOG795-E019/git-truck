@@ -139,7 +139,12 @@ export function lookupFileInTree(tree: GitTreeObject, path: string): GitObject |
 }
 
 export function getDirName(dir: string) {
-  return resolvePath(dir).split(sep).slice().reverse()[0]
+  if (!dir.includes(sep)) return ""
+  const resolved = resolvePath(dir)
+  const dirname = resolved.substring(0, resolved.lastIndexOf(sep) || 1)
+  if (dirname === resolved) return ""
+  const parts = dirname.split(sep).filter(Boolean)
+  return parts.length > 0 ? parts[parts.length - 1] : ""
 }
 
 export const formatMs = (ms: number) => {
