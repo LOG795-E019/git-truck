@@ -137,8 +137,8 @@ const defaultOptions: Options = {
   selectedFiles: [],
   fileGroups: [],
   selectedFilePaths: [],
+  fileAuthorMode: "individual",// Default to individual mode
   cohesionRatio:60,
-  fileAuthorMode: "individual", // Default to individual mode
   minFilesChanged: 1,
   maxContributors: 15
 }
@@ -224,6 +224,6 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setMaxContributors: () => {
       throw new Error("No setMaxContributorsSetter provided")
-    },
+    }
   }
 }
