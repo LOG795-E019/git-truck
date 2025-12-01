@@ -18,10 +18,7 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
     authors: string[]
     matrix: number[][]
     collaborationsMap?: Record<string, any>
-  }>({
-    authors: [],
-    matrix: []
-  })
+  }>({ authors: [], matrix: [] })
 
   const svgRef = useRef<SVGSVGElement>(null)
   const { databaseInfo, repo } = useData()
@@ -137,29 +134,42 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
 
     const { authors: allAuthors, collaborationsMap } = fetcher.data
 
-    // setUp author file count
-    const authorFilesCount: Record<string, Set<string>> = {}
-    allAuthors.forEach((author) => {
-      authorFilesCount[author] = new Set()
-    })
+    // arrange names in the prefered setup: 'user1 - user2' SORTED BY NAME
+    const normalize = (a: string, b: string) => [a, b].sort().join(" - ")
 
-    // process the total file count per author
+    // ensure names are normalized are create a map of them
+    // push the associated files in the map for the pairing
+    const normalizedMap: Record<string, (typeof collaborationsMap)[string]> = {}
     Object.entries(collaborationsMap).forEach(([key, files]) => {
       const [a1, a2] = key.split(" - ")
+      const norm = normalize(a1, a2)
+
+      if (!normalizedMap[norm]) normalizedMap[norm] = []
+      normalizedMap[norm].push(...files)
+    })
+
+    // create an entry for each author
+    const authorFilesCount: Record<string, Set<string>> = {}
+    allAuthors.forEach((a) => (authorFilesCount[a] = new Set()))
+
+    // for each author, add the files to the count PER AUTHOR
+    Object.entries(normalizedMap).forEach(([key, files]) => {
+      const [a1, a2] = key.split(" - ")
       files.forEach((f) => {
-        authorFilesCount[a1]?.add(f.file)
-        authorFilesCount[a2]?.add(f.file)
+        authorFilesCount[a1].add(f.file)
+        authorFilesCount[a2].add(f.file)
       })
     })
 
-    // filter authors by minFilesChanged
-    const eligibleAuthors = allAuthors.filter((author) => (authorFilesCount[author]?.size ?? 0) >= minFilesChanged)
+    // filter out authors that dont have enough files (minFilesChanged: from heatmap filter options)
+    const eligibleAuthors = allAuthors.filter((a) => authorFilesCount[a].size >= minFilesChanged)
 
-    // adds up the values depending on the current metric
+    // holds the values per author of the current metric
     const authorActivity: Record<string, number> = {}
-    eligibleAuthors.forEach((author) => (authorActivity[author] = 0))
+    eligibleAuthors.forEach((a) => (authorActivity[a] = 0))
 
-    Object.entries(collaborationsMap).forEach(([key, files]) => {
+    // from the map, collect metric valyes from each file for each author
+    Object.entries(normalizedMap).forEach(([key, files]) => {
       const [a1, a2] = key.split(" - ")
       if (!eligibleAuthors.includes(a1) || !eligibleAuthors.includes(a2)) return
 
@@ -180,23 +190,36 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
       authorActivity[a2] += value
     })
 
-    // limit number of authors by maxContributors
+    // only show the TOP contributors: maxContributors is from heatmap filter options
+    // sort my current metric value
     const activeAuthors = Object.entries(authorActivity)
       .sort((a, b) => b[1] - a[1])
       .slice(0, maxContributors)
-      .map(([author]) => author)
+      .map(([a]) => a)
 
     setAuthors(activeAuthors)
 
-    // Heatmap matrix (active authors only)
+    // ensures the map used are only from active authors (after the filtering of authors)
+    const filteredPairs: typeof normalizedMap = {}
+    Object.entries(normalizedMap).forEach(([key, files]) => {
+      const [a1, a2] = key.split(" - ")
+      // both authors must be active to be in the map of values
+      if (activeAuthors.includes(a1) && activeAuthors.includes(a2)) {
+        filteredPairs[key] = files
+      }
+    })
+
+    setCollaborationsMap(filteredPairs)
+
+    // create the matrix that the heatmap uses for values [i][j]
     const newMatrix = activeAuthors.map((a1) =>
       activeAuthors.map((a2) => {
         if (a1 === a2) return 0
 
-        const key1 = `${a1} - ${a2}`
-        const key2 = `${a2} - ${a1}`
-        const files = collaborationsMap[key1] ?? collaborationsMap[key2] ?? []
+        const key = normalize(a1, a2) // ALWAYS the same key, check for user1 - user2 or user2 - user1 later
+        const files = filteredPairs[key] ?? [] // find the files for the pair
 
+        // sums up the value, depending on the current metric
         return files.reduce((sum, f) => {
           switch (sizeMetric) {
             case "MOST_COMMITS":
@@ -212,27 +235,12 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
       })
     )
 
-    // only show collaborators if both are active
-    const filteredPairs: Record<string, (typeof collaborationsMap)[string]> = {}
-    Object.entries(collaborationsMap).forEach(([key, files]) => {
-      const [a1, a2] = key.split(" - ")
-      if (activeAuthors.includes(a1) && activeAuthors.includes(a2)) {
-        filteredPairs[key] = files
-      }
-    })
-
     setMatrix(newMatrix)
-    setCollaborationsMap(filteredPairs)
   }, [fetcher.data, sizeMetric, minFilesChanged, maxContributors])
 
   // Update global heatmap selection state
   useEffect(() => {
-    setHeatmapSelection({
-      selectedLabel,
-      collaborationsMap,
-      sizeMetric,
-      metricLabel
-    })
+    setHeatmapSelection({ selectedLabel, collaborationsMap, sizeMetric, metricLabel })
   }, [selectedLabel, collaborationsMap, sizeMetric, metricLabel])
 
   useEffect(() => {

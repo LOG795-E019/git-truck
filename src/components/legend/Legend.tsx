@@ -25,7 +25,7 @@ export function Legend({
   const deferredHoveredObject = useDeferredValue(hoveredObject)
 
   // Hide legend for Activity and Heatmap chart types
-  if (chartType === "ACTIVITY" || chartType === "HEAT_MAP" || chartType === "AUTHOR_GRAPH") return null
+  if (chartType === "ACTIVITY" || chartType === "HEAT_MAP") return null
 
   const metricCache = metricsData.get(metricType) ?? undefined
 
