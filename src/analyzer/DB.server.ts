@@ -744,18 +744,18 @@ export default class DB {
   public async getLineChangePerTime(timerange: [number, number]) {
     const [query, timeUnit] = this.getTimeStringFormat(timerange)
     const res = await this.query(`
-      SELECT strftime(date, '${query}') as timestring, 
-            SUM(insertions + deletions) AS total_changes, 
-            MIN(committertime) AS ct 
+      SELECT strftime(date, '${query}') as timestring,
+            SUM(insertions + deletions) AS total_changes,
+            MIN(committertime) AS ct
       FROM (
-        SELECT date_trunc('${timeUnit}', to_timestamp(fc.committertime)) AS date, 
+        SELECT date_trunc('${timeUnit}', to_timestamp(fc.committertime)) AS date,
               fc.committertime,
               fc.insertions,
               fc.deletions
         FROM filechanges_commits_renamed_cached fc
         WHERE fc.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
-      ) 
-      GROUP BY date 
+      )
+      GROUP BY date
       ORDER BY date ASC;
     `)
 
@@ -782,6 +782,149 @@ export default class DB {
 
     const sorted = final.sort((a, b) => a.timestamp - b.timestamp)
     return sorted
+  }
+
+  public async getActivityData(timerange: [number, number]) {
+    const res = await this.query(`
+      SELECT
+        author,
+        strftime(date, '%Y-%m-%d') as day,
+        MIN(committertime) AS timestamp,
+        COUNT(DISTINCT commithash) AS commits,
+        SUM(insertions + deletions) AS line_changes,
+        COUNT(DISTINCT filepath) AS file_changes
+      FROM (
+        SELECT
+          date_trunc('day', to_timestamp(committertime)) AS date,
+          committertime,
+          commithash,
+          filepath,
+          insertions,
+          deletions,
+          author
+        FROM filechanges_commits_renamed_cached
+        WHERE committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+      ) fc
+      GROUP BY date, author
+      ORDER BY date ASC;
+    `)
+
+    const data = res.map((row) => ({
+      author: row["author"] as string,
+      date: row["day"] as string,
+      timestamp: Number(row["timestamp"]),
+      commits: Number(row["commits"]),
+      lineChanges: Number(row["line_changes"]),
+      fileChanges: Number(row["file_changes"])
+    }))
+
+    const oneDay = 24 * 60 * 60
+    const days: string[] = []
+    for (let t = timerange[0]; t <= timerange[1]; t += oneDay) {
+      const date = new Date(t * 1000)
+      const label = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+      days.push(label)
+    }
+
+    return { data: data, days: days }
+  }
+
+  public async getHeatmapData(timerange: [number, number], metric: string) {
+    // Get all authors
+    const allAuthorsRes = await this.query(`
+    SELECT DISTINCT author
+    FROM filechanges_commits_renamed_cached
+    WHERE committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+    ORDER BY author;
+  `)
+
+    const authors = allAuthorsRes.map((row) => row["author"] as string)
+
+    // Get per-file data per author pair
+    const res = await this.query(`
+    SELECT
+      a1.author AS author1,
+      a2.author AS author2,
+      a1.filepath AS file,
+      COUNT(DISTINCT a1.commithash) + COUNT(DISTINCT a2.commithash) AS total_commits,
+      SUM(a1.insertions + a1.deletions + a2.insertions + a2.deletions) AS total_line_changes,
+      1 AS shared_files
+    FROM filechanges_commits_renamed_cached a1
+    JOIN filechanges_commits_renamed_cached a2
+      ON a1.filepath = a2.filepath
+      AND a1.author < a2.author
+    WHERE a1.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+      AND a2.committertime BETWEEN ${timerange[0]} AND ${timerange[1]}
+    GROUP BY a1.author, a2.author, a1.filepath
+    ORDER BY a1.author, a2.author;
+  `)
+
+    // Map collaborations per file
+    const collaborations: {
+      author1: string
+      author2: string
+      sharedFiles: number
+      totalLineChanges: number
+      totalCommits: number
+      file: string
+    }[] = res.map((row) => ({
+      author1: row["author1"] as string,
+      author2: row["author2"] as string,
+      file: row["file"] as string,
+      sharedFiles: Number(row["shared_files"]),
+      totalLineChanges: Number(row["total_line_changes"]),
+      totalCommits: Number(row["total_commits"])
+    }))
+
+    // Build matrix for heatmap
+    const matrix: number[][] = Array(authors.length)
+      .fill(0)
+      .map(() => Array(authors.length).fill(0))
+
+    // Also build a per-author-pair map for file metrics
+    const collaborationsMap: Record<string, typeof collaborations> = {}
+
+    collaborations.forEach((c) => {
+      const i = authors.indexOf(c.author1)
+      const j = authors.indexOf(c.author2)
+
+      let value = 0
+      switch (metric) {
+        case "MOST_COMMITS":
+          value = c.totalCommits
+          break
+        case "MOST_CONTRIBS":
+          value = c.totalLineChanges
+          break
+        case "FILE_SIZE":
+          value = c.sharedFiles
+          break
+        default:
+          value = c.sharedFiles
+      }
+
+      matrix[i][j] = value
+      matrix[j][i] = value
+
+      const key = `${c.author1} - ${c.author2}`
+      if (!collaborationsMap[key]) collaborationsMap[key] = []
+      collaborationsMap[key].push(c)
+    })
+
+    // Zero out diagonal
+    for (let i = 0; i < authors.length; i++) {
+      matrix[i][i] = 0
+    }
+
+    return { authors, matrix, collaborationsMap }
+  }
+
+  public getWeekNumber(date: Date): number {
+    const temp = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+    const dayNum = temp.getUTCDay() || 7
+    temp.setUTCDate(temp.getUTCDate() + 4 - dayNum)
+    const yearStart = new Date(Date.UTC(temp.getUTCFullYear(), 0, 1))
+    return Math.ceil(((temp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
   }
 
   public async updateColorSeed(seed: string) {
