@@ -38,6 +38,8 @@ import { createHash } from "crypto"
 import fileTypeRulesJSON from "./fileTypeRules.json"
 import jLouvain from "~/utils/jLouvainWrapper"
 import { group } from "console"
+import Activity from "./Activity"
+import Heatmap from "./HeatMap"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
@@ -88,6 +90,11 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   const [selectedAuthorName, setSelectedAuthorName] = useState<string>("")
   // Get relationships map
   const relationshipsMap = getAuthorsRelationships(databaseInfo)
+
+  // Handle ACTIVITY and HEAT_MAP separately to avoid unnecessary computations
+  const isActivity = chartType === "ACTIVITY"
+  const isHeatmap = chartType === "HEAT_MAP"
+
   let numberOfDepthLevels: number | undefined = undefined
   switch (depthType) {
     case "One":
@@ -111,6 +118,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   }
 
   const filetree = useMemo(() => {
+    if (isActivity || isHeatmap) return databaseInfo.fileTree
     // TODO: make filtering faster, e.g. by not having to refetch everything every time
     const ig = ignore()
     ig.add(databaseInfo.hiddenFiles)
@@ -121,6 +129,8 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       children: flatten(filtered)
     } as GitTreeObject
   }, [
+    isActivity,
+    isHeatmap,
     databaseInfo.fileTree,
     hierarchyType,
     databaseInfo.hiddenFiles,
@@ -129,6 +139,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   ])
 
   const nodes = useMemo(() => {
+    if (isActivity || isHeatmap) return []
     console.time("nodes")
     if (size.width === 0 || size.height === 0) return []
     const res = createPartitionedHiearchy(
@@ -258,6 +269,23 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
         .slice(0, 5)
         .map(([author2]) => author2)
     : []
+  // Render activity if selected
+  if (isActivity) {
+    return (
+      <div className="relative grid h-full place-items-center overflow-hidden !transition-none" ref={ref}>
+        <Activity filetree={filetree} sizeMetric={sizeMetric} />
+      </div>
+    )
+  }
+
+  // Render heatmap if selected
+  if (isHeatmap) {
+    return (
+      <div className="relative grid h-full place-items-center overflow-hidden !transition-none" ref={ref}>
+        <Heatmap filetree={filetree} sizeMetric={sizeMetric} />
+      </div>
+    )
+  }
 
   return (
     <div className="relative grid place-items-center overflow-hidden" ref={ref}>
