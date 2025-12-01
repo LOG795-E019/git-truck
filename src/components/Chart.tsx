@@ -48,7 +48,7 @@ type Relationship =
   commonFiles: string[]
   author1Contribs: { nb_commits: number; nb_line_change: number }
   author2Contribs: { nb_commits: number; nb_line_change: number }
-  cohesions: {commits: number; line_change: number}
+  cohesions: {commits: number; line_change: number, file_change: number}
 }
 
 type RelationshipMap = Record<
@@ -1348,6 +1348,7 @@ function createAuthorNetworkHierarchy(
       case "MOST_COMMITS":
         value = stats["nb_commits"] ?? 1
         break
+      case "FILE_SIZE":
       case "MOST_CONTRIBS":
         value = stats["nb_line_change"] ?? 1
         break
@@ -1425,73 +1426,101 @@ function createAuthorNetworkHierarchy(
 
 export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
   const relationshipMap: RelationshipMap = {}
-
   const authorsFileStats = databaseInfo.authorsFilesStats
   const authors = Object.keys(authorsFileStats)
 
-  // Initialize all authors first
+  let maxCommon = 0 // only need count
+
+  // 1. Initialize authors
   for (const author of authors) {
-    if (!relationshipMap[author]) relationshipMap[author] = { Relationships: {} }
+    relationshipMap[author] = { Relationships: {} }
   }
+
+  // 2. Compute relationships + track max common
+  const rawRelationships: {
+    author1: string;
+    author2: string;
+    commonFiles: string[];
+  }[] = []
 
   for (let i = 0; i < authors.length; i++) {
     const author1 = authors[i]
-
     for (let j = i + 1; j < authors.length; j++) {
       const author2 = authors[j]
 
-      // Find common files
       const files1 = Object.keys(authorsFileStats[author1])
-      const files2 = Object.keys(authorsFileStats[author2])
+      const files2 = new Set(Object.keys(authorsFileStats[author2]))
+
       const commonFiles = files1.filter((f) => {
-        if (!files2.includes(f)) return false
+        if (!files2.has(f)) return false
         const lc1 = authorsFileStats[author1][f].nb_line_change
         const lc2 = authorsFileStats[author2][f].nb_line_change
         return (lc1 >= 0.2 * lc2 && lc2 > 0) || (lc2 >= 0.2 * lc1 && lc1 > 0)
       })
 
       if (commonFiles.length > 0) {
-        const relData = {
-          commonFiles,
-          author1Contribs: commonFiles.reduce(
-            (acc, file) => ({
-              nb_commits: acc.nb_commits + authorsFileStats[author1][file].nb_commits,
-              nb_line_change: acc.nb_line_change + authorsFileStats[author1][file].nb_line_change
-            }),
-            { nb_commits: 0, nb_line_change: 0 }
-          ),
-          author2Contribs: commonFiles.reduce(
-            (acc, file) => ({
-              nb_commits: acc.nb_commits + authorsFileStats[author2][file].nb_commits,
-              nb_line_change: acc.nb_line_change + authorsFileStats[author2][file].nb_line_change
-            }),
-            { nb_commits: 0, nb_line_change: 0 }
-          ),
-          cohesions: { commits: 0, line_change: 0 }
-        }
-        const totalCommits = relData.author1Contribs.nb_commits + relData.author2Contribs.nb_commits
-        const totalLineChange = relData.author1Contribs.nb_line_change + relData.author2Contribs.nb_line_change
-        //console.log(`Authors: ${author1} & ${author2} - Total Commits: ${totalCommits}, Total Line Change: ${totalLineChange}`);
-        if (totalCommits > 0 && totalLineChange > 0) {
-          relData.cohesions = {
-            commits: totalCommits? (1-(Math.abs(relData.author1Contribs.nb_commits  - relData.author2Contribs.nb_commits )/ totalCommits))*100:0,
-            line_change: totalLineChange ? (1-(Math.abs(relData.author1Contribs.nb_line_change  - relData.author2Contribs.nb_line_change )/ totalLineChange))*100:0,
-          }
-          
-        }
-       
-        relationshipMap[author1].Relationships[author2] = relData
-        relationshipMap[author2].Relationships[author1] = {
-          commonFiles,
-          author1Contribs: relData.author2Contribs,
-          author2Contribs: relData.author1Contribs,
-          cohesions: relData.cohesions,
-        }
+        rawRelationships.push({ author1, author2, commonFiles })
+        if (commonFiles.length > maxCommon) maxCommon = commonFiles.length
       }
     }
   }
+
+  // 3. Now compute ratios + fill map
+  for (const rel of rawRelationships) {
+    const { author1, author2, commonFiles } = rel
+
+    const author1Contribs = commonFiles.reduce(
+      (acc, file) => ({
+        nb_commits: acc.nb_commits + authorsFileStats[author1][file].nb_commits,
+        nb_line_change: acc.nb_line_change + authorsFileStats[author1][file].nb_line_change,
+      }),
+      { nb_commits: 0, nb_line_change: 0 }
+    )
+
+    const author2Contribs = commonFiles.reduce(
+      (acc, file) => ({
+        nb_commits: acc.nb_commits + authorsFileStats[author2][file].nb_commits,
+        nb_line_change: acc.nb_line_change + authorsFileStats[author2][file].nb_line_change,
+      }),
+      { nb_commits: 0, nb_line_change: 0 }
+    )
+
+    const totalCommits = author1Contribs.nb_commits + author2Contribs.nb_commits
+    const totalLineChange = author1Contribs.nb_line_change + author2Contribs.nb_line_change
+
+    // COMPUTE ratios
+    const fileChangeRatio = maxCommon > 0 ? (commonFiles.length / maxCommon)*100 : 0
+
+    const cohesions = {
+      file_change: fileChangeRatio,
+      commits:
+        totalCommits > 0
+          ? (1 - Math.abs(author1Contribs.nb_commits - author2Contribs.nb_commits) / totalCommits) * 100
+          : 0,
+      line_change:
+        totalLineChange > 0
+          ? (1 - Math.abs(author1Contribs.nb_line_change - author2Contribs.nb_line_change) / totalLineChange) * 100
+          : 0,
+    }
+
+    relationshipMap[author1].Relationships[author2] = {
+      commonFiles,
+      author1Contribs,
+      author2Contribs,
+      cohesions,
+    }
+
+    relationshipMap[author2].Relationships[author1] = {
+      commonFiles,
+      author1Contribs: author2Contribs,
+      author2Contribs: author1Contribs,
+      cohesions,
+    }
+  }
+
   return relationshipMap
 }
+
 
 interface Edge {
   source: string,
@@ -1514,7 +1543,8 @@ function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeM
       // If not, create it.
       if(!existingEdges.has(node + ";" + key) && !existingEdges.has(key + ";" + node)){
         // --Calculate weight here--
-        const cohesion = sizeMetricType=== "MOST_CONTRIBS" ? value.cohesions.line_change: value.cohesions.commits
+        const cohesion = sizeMetricType=== "MOST_CONTRIBS" ? value.cohesions.line_change: sizeMetricType === "MOST_COMMITS" ? value.cohesions.commits:value.cohesions.file_change;
+        console.log("cohesion",cohesion);
         console.log("cohesionRatio: ",cohesionRatio);
         if(cohesion > cohesionRatio){
           edge_data.push({
@@ -1632,6 +1662,7 @@ function createAggregatedAuthorNodesForGroup(
           case "MOST_CONTRIBS":
             contribution = fileStats[filePath].nb_line_change || 0
             break
+          case "FILE_SIZE":
           case "EQUAL_SIZE":
             contribution = 1 // Each file counts as 1 for this author
             break

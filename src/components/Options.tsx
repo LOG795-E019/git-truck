@@ -352,9 +352,11 @@ export const Options = memo(function Options() {
           <EnumSelect
             enum={
               chartType === "AUTHOR_GRAPH"
-                ? (Object.fromEntries(
-                    Object.entries(SizeMetric).filter(([key]) => key !== "FILE_SIZE" && key !== "LAST_CHANGED")
-                  ) as Record<SizeMetricType, string>)
+                ? ({
+                      MOST_COMMITS: SizeMetric.MOST_COMMITS,
+                      MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
+                      FILE_SIZE: "Shared files"
+                    } as Record<SizeMetricType, string>)
                 : chartType === "ACTIVITY"
                   ? ({
                       MOST_COMMITS: SizeMetric.MOST_COMMITS,
