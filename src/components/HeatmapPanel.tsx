@@ -28,6 +28,12 @@ export const HeatmapPanel = memo(function HeatmapPanel() {
 
   const { selectedLabel, collaborationsMap, sizeMetric, metricLabel } = selection
 
+  // must check both possibilities: user1 - user2 OR user2 - user1
+  const getFilesForCollaborators = (label: string) => {
+    const [a1, a2] = label.split(" - ")
+    return collaborationsMap[`${a1} - ${a2}`] ?? collaborationsMap[`${a2} - ${a1}`] ?? []
+  }
+
   return (
     <div className="card">
       <h3 className="mb-2 font-semibold text-gray-800">Co-Activity Details</h3>
@@ -46,7 +52,7 @@ export const HeatmapPanel = memo(function HeatmapPanel() {
           <div>
             <p className="mb-1 text-xs font-bold uppercase text-gray-600">Metric Value</p>
             <p className="text-sm text-gray-800">
-              {collaborationsMap[selectedLabel]?.reduce((sum: number, f: any) => {
+              {getFilesForCollaborators(selectedLabel).reduce((sum: number, f: any) => {
                 switch (sizeMetric) {
                   case "MOST_COMMITS":
                     return sum + f.totalCommits
@@ -65,7 +71,7 @@ export const HeatmapPanel = memo(function HeatmapPanel() {
           <div>
             <p className="mb-1 text-xs font-bold uppercase text-gray-600">Files Impacted</p>
             <div className="max-h-96 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500">
-              {collaborationsMap[selectedLabel]?.map((file: any) => (
+              {getFilesForCollaborators(selectedLabel).map((file: any) => (
                 <div key={file.file} className="mb-1">
                   <p className="text-gray-700">{file.file}</p>
                   <p className="text-xs text-gray-500">
