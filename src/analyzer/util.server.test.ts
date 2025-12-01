@@ -9,7 +9,6 @@ import {
   last,
   sleep,
   lookupFileInTree,
-  getDirName,
   formatMs,
   generateTruckFrames,
   getBaseDirFromPath,
@@ -269,14 +268,6 @@ describe("lookupFileInTree", () => {
 
     const result = lookupFileInTree(nestedTree, "dir/file.txt")
     expect(result).toBe(mockBlob)
-  })
-})
-
-describe("getDirName", () => {
-  it("should extract directory name from path", () => {
-    expect(getDirName("/path/to/file.txt")).toBe("to")
-    expect(getDirName("file.txt")).toBe("")
-    expect(getDirName("/root/file.txt")).toBe("root")
   })
 })
 
