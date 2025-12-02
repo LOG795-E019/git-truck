@@ -817,9 +817,14 @@ export const Options = memo(function Options() {
 
             <div className="mt-2 flex flex-col gap-4">
               {/* Minimum files changed */}
+              <label className="text-sm font-semibold text-gray-700">Cohesion Between Contributors (%)</label>
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700">
-                  Cohesion (minimum % of shared work between contributors)
+                  {sizeMetric == "MOST_COMMITS"
+                    ? "Percentage of commits that contributors must share on the same files"
+                    : sizeMetric == "MOST_CONTRIBS"
+                      ? "Percentage of line changes that contributors must share on the same files"
+                      : "Percentage of files that contributors must have worked on together"}
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -872,7 +877,7 @@ export const Options = memo(function Options() {
                   <input
                     type="range"
                     min={1}
-                    max={30}
+                    max={25}
                     value={maxContributors}
                     onChange={(e) => setMaxContributors(Number(e.target.value))}
                     className="flex-1"
