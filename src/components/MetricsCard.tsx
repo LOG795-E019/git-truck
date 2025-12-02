@@ -1,12 +1,150 @@
 import { Icon } from "@mdi/react"
 import { mdiChartLine } from "@mdi/js"
-import { memo, useState, useMemo } from "react"
+import { memo, useState, useMemo, useEffect } from "react"
+import { Slider, Rail, Handles, Tracks } from "react-compound-slider"
 import { useData } from "~/contexts/DataContext"
+import { Handle, Track } from "./sliderUtils"
+import { noEntryColor } from "~/const"
+
+function CompositeScoreSlider({
+  weights,
+  setWeights
+}: {
+  weights: [number, number, number]
+  setWeights: (weights: [number, number, number]) => void
+}) {
+  const sliderStyle: React.CSSProperties = {
+    position: "relative",
+    width: "100%",
+    height: 20,
+    zIndex: 0
+  }
+
+  const domain = [0, 100]
+
+  // Calculate handle positions
+  const handlePositions = [weights[0], weights[0] + weights[1]]
+
+  const updateWeights = (newPositions: readonly number[]) => {
+    const pos1 = Math.max(0, Math.min(100, newPositions[0]))
+    const pos2 = Math.max(pos1, Math.min(100, newPositions[1]))
+
+    const busFactor = pos1
+    const ownership = pos2 - pos1
+    const activity = 100 - pos2
+
+    setWeights([busFactor, ownership, activity])
+  }
+
+  // State for real-time visual updates during dragging
+  const [tempWeights, setTempWeights] = useState<[number, number, number]>(weights)
+
+  useEffect(() => {
+    setTempWeights(weights)
+  }, [weights])
+
+  const updateTempWeights = (newPositions: readonly number[]) => {
+    const pos1 = Math.max(0, Math.min(100, newPositions[0]))
+    const pos2 = Math.max(pos1, Math.min(100, newPositions[1]))
+
+    const busFactor = pos1
+    const ownership = pos2 - pos1
+    const activity = 100 - pos2
+
+    setTempWeights([busFactor, ownership, activity])
+  }
+
+  // Use tempWeights for visual display, weights for actual state
+  const displayWeights = tempWeights
+
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      {/* Visual distribution bars */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: 14,
+          borderRadius: 7,
+          overflow: "hidden",
+          backgroundColor: "#7aa0c4"
+        }}
+      >
+        <div
+          className="bg-red-500"
+          style={{
+            position: "absolute",
+            left: 0,
+            width: `${displayWeights[0]}%`,
+            height: "100%"
+          }}
+        />
+        <div
+          className="bg-yellow-500"
+          style={{
+            position: "absolute",
+            left: `${displayWeights[0]}%`,
+            width: `${displayWeights[1]}%`,
+            height: "100%"
+          }}
+        />
+        <div
+          className="bg-green-500"
+          style={{
+            position: "absolute",
+            left: `${displayWeights[0] + displayWeights[1]}%`,
+            width: `${displayWeights[2]}%`,
+            height: "100%"
+          }}
+        />
+      </div>
+
+      {/* Slider overlay */}
+      <Slider
+        mode={3}
+        step={5}
+        domain={domain}
+        rootStyle={sliderStyle}
+        onChange={updateWeights}
+        onUpdate={updateTempWeights}
+        values={handlePositions}
+      >
+        <Rail>
+          {({ getRailProps }) => (
+            <div
+              style={{
+                position: "absolute",
+                width: "100%",
+                height: 14,
+                borderRadius: 7,
+                backgroundColor: "transparent",
+                cursor: "pointer"
+              }}
+              {...getRailProps()}
+            />
+          )}
+        </Rail>
+        <Handles>
+          {({ handles, getHandleProps }) => (
+            <div className="slider-handles">
+              {handles.map((handle) => (
+                <Handle key={handle.id} handle={handle} domain={domain} getHandleProps={getHandleProps} />
+              ))}
+            </div>
+          )}
+        </Handles>
+      </Slider>
+    </div>
+  )
+}
 
 export const MetricsCard = memo(function MetricsCard() {
   const { databaseInfo } = useData()
   const [isExpanded, setIsExpanded] = useState(true)
   const [showDetails, setShowDetails] = useState(false)
+  const [weights, setWeights] = useState<[number, number, number]>([40, 40, 20])
 
   const metrics = useMemo(() => {
     // Bus factor
@@ -75,7 +213,15 @@ export const MetricsCard = memo(function MetricsCard() {
     const busFactorScore = Math.min(100, ((totalFiles - busFactor) / totalFiles) * 100)
     const giniScore = (1 - giniCoefficient) * 100
     const activityScore = Math.min(100, (commits30Days / 30) * 10)
-    const healthScore = ((busFactorScore * 0.4 + giniScore * 0.4 + activityScore * 0.2) / 100) * 100
+
+    // Dynamic weights based on slider
+    const [busFactorWeight, ownershipWeight, activityWeight] = weights
+    const healthScore =
+      ((busFactorScore * (busFactorWeight / 100) +
+        giniScore * (ownershipWeight / 100) +
+        activityScore * (activityWeight / 100)) /
+        100) *
+      100
 
     // 80/20 Rule Check
     const sortedContribs = [...contributions].sort((a, b) => b - a)
@@ -104,7 +250,7 @@ export const MetricsCard = memo(function MetricsCard() {
       staleFilesPercentage,
       staleFiles
     }
-  }, [databaseInfo])
+  }, [databaseInfo, weights])
 
   return (
     <div className="card">
@@ -139,9 +285,12 @@ export const MetricsCard = memo(function MetricsCard() {
                 </span>
               </div>
               <p className="text-xs text-gray-600">
-                Composite score: bus factor (40%), ownership distribution (40%), activity (20%)
+                Composite score: bus factor ({weights[0]}%), ownership distribution ({weights[1]}%), activity (
+                {weights[2]}%)
               </p>
             </div>
+
+            <CompositeScoreSlider weights={weights} setWeights={setWeights} />
 
             <button className="btn btn-xs w-full" onClick={() => setShowDetails(!showDetails)}>
               {showDetails ? "Hide Details" : "Show Details"}
