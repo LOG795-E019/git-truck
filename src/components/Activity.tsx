@@ -304,7 +304,7 @@ export function ActivityStatsPanel() {
   return (
     <div className="card">
       <p>
-        <strong>Total days:</strong> {filteredActivityData.length}
+        <strong>Total days:</strong> {new Set(filteredActivityData.map((d) => d.date)).size}
       </p>
       <p>
         <strong>Total commits:</strong> {d3.sum(filteredActivityData, (d) => d.commits)}
