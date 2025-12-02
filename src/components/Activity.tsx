@@ -540,11 +540,6 @@ const Activity = ({ filetree, sizeMetric }: Pick<ActivityProps, "filetree" | "si
 
     console.log("Parent dimensions:", width, height, "ParentRect:", parentRect)
 
-    const cellSize = 12
-    const cellPadding = 3
-    const topPadding = 120
-    const leftPadding = 50
-
     const dataByDate = new Map<string, ActivityDataPoint>()
     filteredActivityData.forEach((d) => dataByDate.set(d.date, d))
 
@@ -561,10 +556,14 @@ const Activity = ({ filetree, sizeMetric }: Pick<ActivityProps, "filetree" | "si
     const numCols = numWeeks
     const numRows = 7
 
+    const cellSize = 12
+    const cellPadding = 3
+
     const gridWidth = numCols * (cellSize + cellPadding)
     const gridHeight = numRows * (cellSize + cellPadding)
 
-    const xOffset = leftPadding
+    // center horizontally and vertically
+    const xOffset = (width - gridWidth) / 2
     const yOffset = (height - gridHeight) / 2
 
     console.log(`Year ${selectedYear} grid:`, numCols, "cols x", numRows, "rows")

@@ -807,33 +807,6 @@ export const Options = memo(function Options() {
             </fieldset>
           </>
         )}
-        {chartType === "AUTHOR_GRAPH" && (
-          <fieldset className="mt-2 rounded-lg border p-2">
-            <legend className="card__title ml-1.5 justify-start gap-2">
-              <Icon path={mdiGrid} size="1.25em" />
-              Author Graph Filter
-            </legend>
-
-            <div className="mt-2 flex flex-col gap-4">
-              {/* Minimum files changed */}
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700">Cohesion</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min={10}
-                    max={90}
-                    step={10}
-                    value={cohesionRatio} 
-                    onChange={(e) =>{e.stopPropagation();setCohesionRatio(Number(e.target.value));}}
-                    className="flex-1"
-                  />
-                  <span className="w-12 text-right text-xs text-gray-500">{cohesionRatio}</span>
-                </div>
-              </div>
-            </div>
-          </fieldset>
-        )}
 
         {chartType === "AUTHOR_GRAPH" && (
           <fieldset className="mt-2 rounded-lg border p-2">
