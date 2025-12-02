@@ -5,6 +5,21 @@ jest.mock("latest-version", () => ({
 
 import { analyzeRenamedFile, getTimeIntervals } from "./util.server"
 import type { RenameEntry } from "./model"
+import {
+  analyzeRenamedFile,
+  getTimeIntervals,
+  last,
+  sleep,
+  lookupFileInTree,
+  formatMs,
+  generateTruckFrames,
+  getBaseDirFromPath,
+  getRepoNameFromPath,
+  getSiblingRepository,
+  isValidURI,
+  promiseHelper
+} from "./util.server"
+import type { RenameEntry, GitTreeObject, GitBlobObject } from "./model"
 
 describe("analyzeRenamedFile", () => {
   const repo = "test-repo"
@@ -185,5 +200,143 @@ describe("getTimeIntervals", () => {
     for (let i = 0; i < intervals.length - 1; i++) {
       expect(intervals[i][1]).toBeLessThanOrEqual(intervals[i + 1][1])
     }
+  })
+})
+
+describe("last", () => {
+  it("should return the last element of an array", () => {
+    expect(last([1, 2, 3])).toBe(3)
+    expect(last(["a", "b", "c"])).toBe("c")
+    expect(last([42])).toBe(42)
+  })
+
+  it("should return undefined for empty array", () => {
+    expect(last([])).toBeUndefined()
+  })
+})
+
+describe("sleep", () => {
+  it("should resolve after the specified time", async () => {
+    const start = Date.now()
+    await sleep(10)
+    const end = Date.now()
+    expect(end - start).toBeGreaterThanOrEqual(8)
+  })
+})
+
+describe("lookupFileInTree", () => {
+  const mockBlob: GitBlobObject = {
+    type: "blob",
+    name: "file.txt",
+    path: "file.txt",
+    sizeInBytes: 100,
+    hash: "abc123"
+  }
+
+  const mockTree: GitTreeObject = {
+    type: "tree",
+    name: "root",
+    path: "",
+    children: [mockBlob],
+    hash: "def456"
+  }
+
+  it("should find a file at root level", () => {
+    const result = lookupFileInTree(mockTree, "file.txt")
+    expect(result).toBe(mockBlob)
+  })
+
+  it("should return undefined for non-existent file", () => {
+    const result = lookupFileInTree(mockTree, "nonexistent.txt")
+    expect(result).toBeUndefined()
+  })
+
+  it("should handle nested paths", () => {
+    const nestedTree: GitTreeObject = {
+      type: "tree",
+      name: "root",
+      path: "",
+      children: [
+        {
+          type: "tree",
+          name: "dir",
+          path: "dir",
+          children: [mockBlob],
+          hash: "ghi789"
+        }
+      ],
+      hash: "def456"
+    }
+
+    const result = lookupFileInTree(nestedTree, "dir/file.txt")
+    expect(result).toBe(mockBlob)
+  })
+})
+
+describe("formatMs", () => {
+  it("should format milliseconds correctly", () => {
+    expect(formatMs(1000)).toBe("1.00s")
+    expect(formatMs(1500)).toBe("1.50s")
+    expect(formatMs(100)).toBe("100ms")
+    expect(formatMs(0)).toBe("0ms")
+  })
+})
+
+describe("path utilities", () => {
+  it("getBaseDirFromPath should return parent directory", () => {
+    expect(getBaseDirFromPath("/path/to/repo")).toBe("/path/to")
+    const result = getBaseDirFromPath("repo")
+    expect(result).toMatch(/^\/.+/)
+  })
+
+  it("getRepoNameFromPath should extract repo name", () => {
+    expect(getRepoNameFromPath("/path/to/my-repo")).toBe("my-repo")
+    expect(getRepoNameFromPath("my-repo")).toBe("my-repo")
+  })
+
+  it("getSiblingRepository should construct sibling path", () => {
+    expect(getSiblingRepository("/path/to/repo1", "repo2")).toBe("/path/to/repo2")
+  })
+})
+
+describe("isValidURI", () => {
+  it("should check if string can be decoded as URI component", () => {
+    expect(isValidURI("http://example.com")).toBe(true)
+    expect(isValidURI("https://example.com")).toBe(true)
+    expect(isValidURI("ftp://example.com")).toBe(true)
+    expect(isValidURI("not-a-uri")).toBe(true)
+    expect(isValidURI("")).toBe(true)
+    expect(isValidURI("%")).toBe(false)
+  })
+})
+
+describe("promiseHelper", () => {
+  it("should resolve successful promises", async () => {
+    const result = await promiseHelper(Promise.resolve("success"))
+    expect(result).toEqual(["success", null])
+  })
+
+  it("should reject failed promises", async () => {
+    const error = new Error("test error")
+    const result = await promiseHelper(Promise.reject(error))
+    expect(result).toEqual([null, error])
+  })
+})
+
+describe("generateTruckFrames", () => {
+  it("should generate frames for truck animation", () => {
+    const frames = generateTruckFrames(3)
+
+    expect(frames).toHaveLength(3)
+    expect(frames[0]).toBe("  🚛\n")
+    expect(frames[1]).toBe(" 🚛\n")
+    expect(frames[2]).toBe("🚛\n")
+  })
+
+  it("should handle length of 1", () => {
+    const frames = generateTruckFrames(1)
+
+    expect(frames).toHaveLength(1)
+    expect(frames[0]).toBe("🚛\n")
   })
 })
