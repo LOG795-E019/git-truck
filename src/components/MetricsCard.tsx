@@ -173,11 +173,50 @@ export const MetricsCard = memo(function MetricsCard() {
     // Active contributors
     const totalAuthors = databaseInfo.authors.length
     const now = Date.now()
+
+    const getPeriodLengthSeconds = (dateString: string): number => {
+      if (dateString.startsWith("Week")) return 7 * 24 * 60 * 60
+      if (
+        dateString.includes("Mon") ||
+        dateString.includes("Tue") ||
+        dateString.includes("Wed") ||
+        dateString.includes("Thu") ||
+        dateString.includes("Fri") ||
+        dateString.includes("Sat") ||
+        dateString.includes("Sun")
+      )
+        return 24 * 60 * 60
+      if (
+        dateString.includes("January") ||
+        dateString.includes("February") ||
+        dateString.includes("March") ||
+        dateString.includes("April") ||
+        dateString.includes("May") ||
+        dateString.includes("June") ||
+        dateString.includes("July") ||
+        dateString.includes("August") ||
+        dateString.includes("September") ||
+        dateString.includes("October") ||
+        dateString.includes("November") ||
+        dateString.includes("December")
+      )
+        return 30 * 24 * 60 * 60
+      return 365 * 24 * 60 * 60
+    }
+
     const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000
     const ninetyDaysAgo = now - 90 * 24 * 60 * 60 * 1000
 
-    const recentCommits30 = databaseInfo.commitCountPerDay.filter((d) => d.timestamp * 1000 >= thirtyDaysAgo)
-    const recentCommits90 = databaseInfo.commitCountPerDay.filter((d) => d.timestamp * 1000 >= ninetyDaysAgo)
+    const recentCommits30 = databaseInfo.commitCountPerDay.filter((d) => {
+      const periodLength = getPeriodLengthSeconds(d.date)
+      return (d.timestamp + periodLength) * 1000 >= thirtyDaysAgo
+    })
+
+    const recentCommits90 = databaseInfo.commitCountPerDay.filter((d) => {
+      const periodLength = getPeriodLengthSeconds(d.date)
+      return (d.timestamp + periodLength) * 1000 >= ninetyDaysAgo
+    })
+
     const commits30Days = recentCommits30.reduce((sum, d) => sum + d.count, 0)
     const commits90Days = recentCommits90.reduce((sum, d) => sum + d.count, 0)
 
@@ -190,10 +229,18 @@ export const MetricsCard = memo(function MetricsCard() {
 
     // Recent activity
     const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
-    const recentCommits7 = databaseInfo.commitCountPerDay.filter((d) => d.timestamp * 1000 >= sevenDaysAgo)
+
+    const recentCommits7 = databaseInfo.commitCountPerDay.filter((d) => {
+      const periodLength = getPeriodLengthSeconds(d.date)
+      return (d.timestamp + periodLength) * 1000 >= sevenDaysAgo
+    })
+
     const commits7Days = recentCommits7.reduce((sum, d) => sum + d.count, 0)
     const lineChanges7Days = databaseInfo.lineChangeCountPerDay
-      .filter((d) => d.timestamp * 1000 >= sevenDaysAgo)
+      .filter((d) => {
+        const periodLength = getPeriodLengthSeconds(d.date)
+        return (d.timestamp + periodLength) * 1000 >= sevenDaysAgo
+      })
       .reduce((sum, d) => sum + d.count, 0)
 
     // Top hotspot files

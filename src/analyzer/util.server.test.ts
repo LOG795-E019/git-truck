@@ -3,8 +3,6 @@ jest.mock("latest-version", () => ({
   default: jest.fn().mockResolvedValue("1.0.0")
 }))
 
-import { analyzeRenamedFile, getTimeIntervals } from "./util.server"
-import type { RenameEntry } from "./model"
 import {
   analyzeRenamedFile,
   getTimeIntervals,
