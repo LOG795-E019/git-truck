@@ -69,6 +69,7 @@ export const Options = memo(function Options() {
   const { databaseInfo } = useData()
   const [showAuthorFilter, setShowAuthorFilter] = useState(false)
   const [showFileFilter, setShowFileFilter] = useState(false)
+  const [showCommunityDescription, setShowCommunityDescription] = useState(false)
   const [searchFilter, setSearchFilter] = useState("")
   const [fileSearchFilter, setFileSearchFilter] = useState("")
   const [fileExtensionFilter, setFileExtensionFilter] = useState("")
@@ -421,6 +422,51 @@ export const Options = memo(function Options() {
               }}
               iconMap={groupingTypeIcons}
             />
+          </fieldset>
+        )}
+
+        {chartType === "AUTHOR_GRAPH" && groupingType === "COMMUNITY" && (
+          <fieldset className="mt-2 rounded-lg border p-2">
+            <legend className="card__title ml-1.5 justify-start gap-2">
+              <Icon path={mdiAccountSupervisorCircle} size="1.25em" />
+              Community Grouping Description
+              <button className="btn btn-xs ml-auto" onClick={() => setShowCommunityDescription(!showCommunityDescription)}>
+                  {showCommunityDescription ? "Hide" : "Show"}
+              </button>
+            </legend>
+
+            {showCommunityDescription && (
+              <div className="mt-2 flex flex-col gap-4">
+                {/* Minimum files changed */}
+                <label className="text-sm font-medium text-gray-700">
+                  <b>Community Grouping</b> groups authors together depending on the current <b>Size</b> metric chosen, which will be used to determine the weight of a relationship between two authors.
+                </label>
+                {sizeMetric == "MOST_COMMITS" && (
+                  <label className="text-sm font-medium text-gray-700">
+                    For <b>Commits</b> metric, the closer the percentage of total commits shared between two authors, the higher the weight of their relationship.
+                    <br/><br/>
+                    For example, if Author A shares 40% of their commits with Author B, who in turn shares 60% of their commits with them (thus 20% difference), then that is a better relationship than if it was 10% for A and 70% for B (60% difference, further apart than 20% difference).
+                  </label>
+                )}
+                {sizeMetric == "MOST_CONTRIBS" && (
+                  <label className="text-sm font-medium text-gray-700">
+                    For <b>Line Changes</b> metric, the closer the percentage of author A's line changes that are within shared commits with another author B, is to the same percentage from said other author B from their point of view, the higher the weight of the relationship.
+                    <br/><br/>
+                    For example, if Author A shares 40% of their line changes with Author B, who in turn shares 60% of their line changes with them, then there is a better relationship than if it was 10% for A and 70% for B (20% difference is closer thus better than 60% difference).
+                  </label>
+                )}
+                {sizeMetric == "FILE_SIZE" && (
+                  <label className="text-sm font-medium text-gray-700">
+                    For <b>Shared Files</b> metric, the closer the percentage of total files shared, the higher the weight of the relationship.
+                    <br/><br/>
+                    For example, if Author A shares 40% of their files with Author B, who in turn shares 60% of their files with them, then there is a better relationship than if it was 10% for A and 70% for B (20% difference is closer thus better than 60% difference).
+                  </label>
+                )}
+                <label className="text-sm font-medium text-gray-700">
+                  <b>Author Graph Filter</b> determines the minimal cohesion (%) necessary for groups to form.
+                </label>
+              </div>
+            )}
           </fieldset>
         )}
 
@@ -808,7 +854,7 @@ export const Options = memo(function Options() {
           </>
         )}
 
-        {chartType === "AUTHOR_GRAPH" && (
+        {chartType === "AUTHOR_GRAPH" && groupingType === "COMMUNITY" && (
           <fieldset className="mt-2 rounded-lg border p-2">
             <legend className="card__title ml-1.5 justify-start gap-2">
               <Icon path={mdiGrid} size="1.25em" />
