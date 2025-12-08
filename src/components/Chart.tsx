@@ -43,23 +43,19 @@ import Heatmap from "./HeatMap"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
 
-type Relationship = 
-{
+type Relationship = {
   commonFiles: string[]
   author1Contribs: { nb_commits: number; nb_line_change: number }
   author2Contribs: { nb_commits: number; nb_line_change: number }
-  cohesions: {commits: number; line_change: number, file_change: number}
+  cohesions: { commits: number; line_change: number; file_change: number }
 }
 
 type RelationshipMap = Record<
   string,
   {
-    Relationships: Record<
-      string,
-      Relationship
-    >
+    Relationships: Record<string, Relationship>
   }
->;
+>
 
 export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObject: (obj: GitObject | null) => void }) {
   const [ref, rawSize] = useComponentSize()
@@ -371,7 +367,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                 // Opacity, show top co authors
                 const isInTop = author1 === selectedAuthor && topCoAuthors.includes(author2)
                 let lineOpacity = isInTop ? 0.9 : 0.1
-                groupingType === "COMMUNITY" ? lineOpacity = 0 : null;
+                groupingType === "COMMUNITY" ? (lineOpacity = 0) : null
                 // ...existing code...
                 if (!selectedAuthor) {
                   return [
@@ -453,12 +449,13 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
         {/* Draw author nodes and other nodes */}
         {(() => {
           return nodes.map((d, i) => {
-            const nodeOpacity = !selectedAuthor || groupingType !== "DEFAULT"
-              ? "opacity-100" // all visible when no author selected
-              : selectedAuthor === d.data.name || topCoAuthors.includes(d.data.name)
-                ? "opacity-100" // top coauthors or selected author
-                : "opacity-30"
-            
+            const nodeOpacity =
+              !selectedAuthor || groupingType !== "DEFAULT"
+                ? "opacity-100" // all visible when no author selected
+                : selectedAuthor === d.data.name || topCoAuthors.includes(d.data.name)
+                  ? "opacity-100" // top coauthors or selected author
+                  : "opacity-30"
+
             return (
               <g
                 key={d.data.path}
@@ -554,9 +551,9 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
       const authorName = d.data.name
       // Some author nodes may include a precomputed communityColor property
       //TODO: SELECT COMMUNITY COLOR ONLY IF GROUPING COMMUNITY IS SELECTED
-      if(groupingType === "COMMUNITY"){
-        fillColor = (d.data as any).communityColor as string 
-      }else{
+      if (groupingType === "COMMUNITY") {
+        fillColor = (d.data as any).communityColor as string
+      } else {
         fillColor = authorColors.get(authorName) ?? "#cccccc"
       }
     } else if (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) {
@@ -775,8 +772,8 @@ function createPartitionedHiearchy(
   selectedAuthors: string[],
   fileGroups: Array<{ id: string; name: string; pattern: string; filePaths: string[] }>,
   selectedFilePaths: string[], // Add this parameter
-  fileAuthorMode: "groups" | "individual",// Add this parameter
-  cohesionRatio: number 
+  fileAuthorMode: "groups" | "individual", // Add this parameter
+  cohesionRatio: number
 ) {
   let currentTree = tree
   const steps = path.substring(tree.name.length + 1).split("/")
@@ -1013,7 +1010,7 @@ function createPartitionedHiearchy(
     return bPartition
   } else if (chartType === "AUTHOR_GRAPH") {
     // Create a network/graph layout for author relationships
-    
+
     const authorNetwork = createAuthorNetworkHierarchy(
       databaseInfo,
       currentTree,
@@ -1363,7 +1360,6 @@ function createAuthorNetworkHierarchy(
     const maxSize = maxBubbleSize
     const scaledSize = minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
 
-    
     const communityId = partition[author] ?? "0"
     const communityColor = communityColorMap.get(communityId)
 
@@ -1382,12 +1378,12 @@ function createAuthorNetworkHierarchy(
       communityColor
     }
   })
-  
-  if(groupingType === "COMMUNITY"){
+
+  if (groupingType === "COMMUNITY") {
     const communityMap: Record<string, GitBlobObject[]> = {}
     for (const node of authorNodes) {
       const cid = (node as any).communityId ?? "0"
-      if (!communityMap[cid]) communityMap[cid] = []      
+      if (!communityMap[cid]) communityMap[cid] = []
       node.path = tree.path + `/community-${cid}/@${node.name}`
       communityMap[cid].push(node)
     }
@@ -1411,8 +1407,8 @@ function createAuthorNetworkHierarchy(
     }
     return hierarchy(authorNetworkByCommunityRoot as GitObject)
   }
-// Group authors by community into tree nodes
-  
+  // Group authors by community into tree nodes
+
   const authorNetworkRoot: GitTreeObject = {
     type: "tree",
     name: "author-network",
@@ -1436,23 +1432,35 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
     relationshipMap[author] = { Relationships: {} }
   }
 
+  // Pre-compute and cache file lists for each author to avoid repeated Object.keys() calls
+  const authorFilesCache = new Map<string, string[]>()
+  const authorFilesSetCache = new Map<string, Set<string>>()
+
+  for (const author of authors) {
+    const files = Object.keys(authorsFileStats[author])
+    authorFilesCache.set(author, files)
+    authorFilesSetCache.set(author, new Set(files))
+  }
+
   // 2. Compute relationships + track max common
   const rawRelationships: {
-    author1: string;
-    author2: string;
-    commonFiles: string[];
+    author1: string
+    author2: string
+    commonFiles: string[]
   }[] = []
 
   for (let i = 0; i < authors.length; i++) {
     const author1 = authors[i]
+    const files1 = authorFilesCache.get(author1)
+    if (!files1) continue
+
     for (let j = i + 1; j < authors.length; j++) {
       const author2 = authors[j]
-
-      const files1 = Object.keys(authorsFileStats[author1])
-      const files2 = new Set(Object.keys(authorsFileStats[author2]))
+      const files2Set = authorFilesSetCache.get(author2)
+      if (!files2Set) continue
 
       const commonFiles = files1.filter((f) => {
-        if (!files2.has(f)) return false
+        if (!files2Set.has(f)) return false
         const lc1 = authorsFileStats[author1][f].nb_line_change
         const lc2 = authorsFileStats[author2][f].nb_line_change
         return (lc1 >= 0.2 * lc2 && lc2 > 0) || (lc2 >= 0.2 * lc1 && lc1 > 0)
@@ -1472,7 +1480,7 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
     const author1Contribs = commonFiles.reduce(
       (acc, file) => ({
         nb_commits: acc.nb_commits + authorsFileStats[author1][file].nb_commits,
-        nb_line_change: acc.nb_line_change + authorsFileStats[author1][file].nb_line_change,
+        nb_line_change: acc.nb_line_change + authorsFileStats[author1][file].nb_line_change
       }),
       { nb_commits: 0, nb_line_change: 0 }
     )
@@ -1480,7 +1488,7 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
     const author2Contribs = commonFiles.reduce(
       (acc, file) => ({
         nb_commits: acc.nb_commits + authorsFileStats[author2][file].nb_commits,
-        nb_line_change: acc.nb_line_change + authorsFileStats[author2][file].nb_line_change,
+        nb_line_change: acc.nb_line_change + authorsFileStats[author2][file].nb_line_change
       }),
       { nb_commits: 0, nb_line_change: 0 }
     )
@@ -1489,7 +1497,7 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
     const totalLineChange = author1Contribs.nb_line_change + author2Contribs.nb_line_change
 
     // COMPUTE ratios
-    const fileChangeRatio = maxCommon > 0 ? (commonFiles.length / maxCommon)*100 : 0
+    const fileChangeRatio = maxCommon > 0 ? (commonFiles.length / maxCommon) * 100 : 0
 
     const cohesions = {
       file_change: fileChangeRatio,
@@ -1500,62 +1508,65 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
       line_change:
         totalLineChange > 0
           ? (1 - Math.abs(author1Contribs.nb_line_change - author2Contribs.nb_line_change) / totalLineChange) * 100
-          : 0,
+          : 0
     }
 
     relationshipMap[author1].Relationships[author2] = {
       commonFiles,
       author1Contribs,
       author2Contribs,
-      cohesions,
+      cohesions
     }
 
     relationshipMap[author2].Relationships[author1] = {
       commonFiles,
       author1Contribs: author2Contribs,
       author2Contribs: author1Contribs,
-      cohesions,
+      cohesions
     }
   }
 
   return relationshipMap
 }
 
-
 interface Edge {
-  source: string,
-  target: string,
+  source: string
+  target: string
   weight: number
 }
 
-function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeMetricType, cohesionRatio:number){
+function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeMetricType, cohesionRatio: number) {
   // We get the list of author names that have relationships.
-  const node_data = Object.keys(relationshipMap); 
+  const node_data = Object.keys(relationshipMap)
 
   // We get the list of edges and their weight, while keeping a hashmap to avoid duplicates.
-  const existingEdges: Map<string, boolean> = new Map<string, boolean>();
-  const edge_data: Edge[] = [] as Edge[];
+  const existingEdges: Map<string, boolean> = new Map<string, boolean>()
+  const edge_data: Edge[] = [] as Edge[]
   // We iterate over every node.
   node_data.forEach((node) => {
     // For every node, we iterate over it's relationships in the relationshipMap.
-    for(const [key, value] of Object.entries(relationshipMap[node].Relationships)){
-      // We check if the Edge already exists between these nodes in the hashmap. 
+    for (const [key, value] of Object.entries(relationshipMap[node].Relationships)) {
+      // We check if the Edge already exists between these nodes in the hashmap.
       // If not, create it.
-      if(!existingEdges.has(node + ";" + key) && !existingEdges.has(key + ";" + node)){
+      if (!existingEdges.has(node + ";" + key) && !existingEdges.has(key + ";" + node)) {
         // --Calculate weight here--
-        const cohesion = sizeMetricType=== "MOST_CONTRIBS" ? value.cohesions.line_change: sizeMetricType === "MOST_COMMITS" ? value.cohesions.commits:value.cohesions.file_change;
-        console.log("cohesion",cohesion);
-        console.log("cohesionRatio: ",cohesionRatio);
-        if(cohesion > cohesionRatio){
+        const cohesion =
+          sizeMetricType === "MOST_CONTRIBS"
+            ? value.cohesions.line_change
+            : sizeMetricType === "MOST_COMMITS"
+              ? value.cohesions.commits
+              : value.cohesions.file_change
+        console.log("cohesion", cohesion)
+        console.log("cohesionRatio: ", cohesionRatio)
+        if (cohesion > cohesionRatio) {
           edge_data.push({
             source: node,
             target: key,
-            weight: cohesion,
-          });
+            weight: cohesion
+          })
           // Add new pair to existing Edges.
-          existingEdges.set(node + ";" + key, true);
+          existingEdges.set(node + ";" + key, true)
         }
-
       }
     }
   })
