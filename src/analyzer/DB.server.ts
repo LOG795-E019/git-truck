@@ -888,35 +888,12 @@ export default class DB {
       const i = authors.indexOf(c.author1)
       const j = authors.indexOf(c.author2)
 
-      let value = 0
-      switch (metric) {
-        case "MOST_COMMITS":
-          value = c.totalCommits
-          break
-        case "MOST_CONTRIBS":
-          value = c.totalLineChanges
-          break
-        case "FILE_SIZE":
-          value = c.sharedFiles
-          break
-        default:
-          value = c.sharedFiles
-      }
-
-      matrix[i][j] = value
-      matrix[j][i] = value
-
       const key = `${c.author1} - ${c.author2}`
       if (!collaborationsMap[key]) collaborationsMap[key] = []
       collaborationsMap[key].push(c)
     })
 
-    // Zero out diagonal
-    for (let i = 0; i < authors.length; i++) {
-      matrix[i][i] = 0
-    }
-
-    return { authors, matrix, collaborationsMap }
+    return { authors, collaborationsMap }
   }
 
   public getWeekNumber(date: Date): number {

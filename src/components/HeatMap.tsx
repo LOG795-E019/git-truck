@@ -14,17 +14,11 @@ interface HeatmapProps {
 }
 
 const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
-  const [heatmapData, setHeatmapData] = useState<{
-    authors: string[]
-    matrix: number[][]
-    collaborationsMap?: Record<string, any>
-  }>({ authors: [], matrix: [] })
-
   const svgRef = useRef<SVGSVGElement>(null)
   const { databaseInfo, repo } = useData()
   const [ref, rawSize] = useComponentSize()
   const size = useDeferredValue(rawSize)
-  const fetcher = useFetcher<HeatmapFetcherData>()
+  const fetcher = useFetcher<any>()
   const [visible, setVisible] = useState(false)
 
   // Heatmap options sliders
