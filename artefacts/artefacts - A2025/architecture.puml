@@ -10,18 +10,18 @@ rectangle "Navigateur Web" {
 
 rectangle "Application Git Truck" {
   component "Remix\n(Routes, Loaders, SSR)" as Remix
-  component "Backend Node.js\n(TypeScript, CLI + API)" as Backend
-  database "DuckDB\n(Base analytique)" as DuckDB
+  component "Backend Node.js\n(TypeScript, CLI, API)" as Backend
+  database "DuckDB" as DuckDB
 }
 
-database "Dépôt Git local\n(.git)" as Git
+database "Dépôt Git local" as Git
 
-User --> UI : Interactions
-UI --> Remix : HTTP / Data loading
+User --> UI : Actions
+UI --> Remix : HTTP / Data
 Remix --> Backend : Appels internes
 Backend --> DuckDB : SQL analytique
 Backend --> Git : Commandes git\n(log, tree, blame)
 DuckDB --> Remix : Résultats de requêtes
-Remix --> UI : Données SSR / JSON
+Remix --> UI : SSR / JSON
 
 @enduml
