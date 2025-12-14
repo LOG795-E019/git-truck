@@ -1,6 +1,6 @@
 @startuml
 !theme plain
-title Git Truck — Architecture globale
+title Git Truck — Architecture
 
 actor "Utilisateur" as User
 
@@ -14,13 +14,13 @@ rectangle "Application Git Truck" {
   database "DuckDB" as DuckDB
 }
 
-database "Dépôt Git local" as Git
+database "Dépôt Git Local" as Git
 
 User --> UI : Actions
-UI --> Remix : HTTP / Data
+UI --> Remix : HTTP
 Remix --> Backend : Appels internes
 Backend --> DuckDB : SQL analytique
-Backend --> Git : Commandes git\n(log, tree, blame)
+Backend --> Git : Commandes Git\n(log, tree, blame)
 DuckDB --> Remix : Résultats de requêtes
 Remix --> UI : SSR / JSON
 
