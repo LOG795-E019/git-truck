@@ -1,0 +1,27 @@
+@startuml
+!theme plain
+title Git Truck — Architecture globale
+
+actor "Utilisateur" as User
+
+rectangle "Navigateur Web" {
+  component "UI React\n(D3.js, Tailwind)" as UI
+}
+
+rectangle "Application Git Truck" {
+  component "Remix\n(Routes, Loaders, SSR)" as Remix
+  component "Backend Node.js\n(TypeScript, CLI + API)" as Backend
+  database "DuckDB\n(Base analytique)" as DuckDB
+}
+
+database "Dépôt Git local\n(.git)" as Git
+
+User --> UI : Interactions
+UI --> Remix : HTTP / Data loading
+Remix --> Backend : Appels internes
+Backend --> DuckDB : SQL analytique
+Backend --> Git : Commandes git\n(log, tree, blame)
+DuckDB --> Remix : Résultats de requêtes
+Remix --> UI : Données SSR / JSON
+
+@enduml
