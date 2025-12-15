@@ -1,0 +1,44 @@
+@startuml
+skinparam style strictuml
+skinparam componentStyle rectangle
+skinparam wrapWidth 200
+skinparam maxMessageSize 150
+
+actor User
+
+package "Frontend (Remix + React)" {
+
+component "Heatmap (D3)" as Heatmap
+component "HeatmapPanel" as Panel
+component "OptionsContext" as Options
+component "DataContext" as Data
+
+Heatmap --> Options : Options:\nminFilesChanged\nmaxContributors
+Heatmap --> Data : Repo\nBranche\nPériode
+}
+
+
+package "Remix Loader / API" {
+    component "GET /heatmap" as API
+}
+
+package "Analyse" {
+    component "DB.Server" as Server
+    database "DuckDB" as DuckDB
+}
+
+User --> Heatmap : Click sur cellule
+User --> Options : Modifier options (sliders)
+
+Heatmap --> API : fetch
+API --> Server : getHeatmapData()
+Server --> DuckDB : SQL (file co-activity)
+DuckDB --> Server : Résultat
+Server --> API : authors + collaborationsMap
+API --> Heatmap : Données
+
+Heatmap --> Heatmap : Normaliser paires (clé)\nFiltre auteurs (options)\nConstruire matrice\nNormaliser données pour légende
+
+Heatmap --> Panel : selectedLabel
+Panel --> Panel : Information paire contributeurs (user1-user2)
+@enduml
