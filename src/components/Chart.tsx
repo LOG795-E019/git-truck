@@ -5,6 +5,7 @@ import { useDeferredValue, memo, useEffect, useMemo, useState } from "react"
 import type { GitBlobObject, GitObject, GitTreeObject } from "~/analyzer/model"
 import { useClickedObject } from "~/contexts/ClickedContext"
 import { useComponentSize } from "~/hooks"
+
 import {
   bubblePadding,
   estimatedLetterHeightForDirText,
@@ -35,8 +36,26 @@ import { cn, usePrefersLightMode } from "~/styling"
 import { isChrome, isChromium, isEdgeChromium } from "react-device-detect"
 import { createHash } from "crypto"
 import fileTypeRulesJSON from "./fileTypeRules.json"
+import jLouvain from "~/utils/jLouvainWrapper"
+import { group } from "console"
+import Activity from "./Activity"
+import Heatmap from "./HeatMap"
 
 type CircleOrRectHiearchyNode = HierarchyCircularNode<GitObject> | HierarchyRectangularNode<GitObject>
+
+type Relationship = {
+  commonFiles: string[]
+  author1Contribs: { nb_commits: number; nb_line_change: number }
+  author2Contribs: { nb_commits: number; nb_line_change: number }
+  cohesions: { commits: number; line_change: number; file_change: number }
+}
+
+type RelationshipMap = Record<
+  string,
+  {
+    Relationships: Record<string, Relationship>
+  }
+>
 
 export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObject: (obj: GitObject | null) => void }) {
   const [ref, rawSize] = useComponentSize()
@@ -56,17 +75,22 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
     selectedAuthors,
     fileGroups,
     selectedFilePaths,
-    fileAuthorMode
+    fileAuthorMode,
+    cohesionRatio
   } = useOptions()
   const { path } = usePath()
   const { clickedObject, setClickedObject } = useClickedObject()
   const { setPath } = usePath()
   const { showFilesWithoutChanges, showFilesWithNoJSONRules } = useOptions()
   const [, authorColors] = useMetrics()
-
   const [selectedAuthorName, setSelectedAuthorName] = useState<string>("")
   // Get relationships map
   const relationshipsMap = getAuthorsRelationships(databaseInfo)
+
+  // Handle ACTIVITY and HEAT_MAP separately to avoid unnecessary computations
+  const isActivity = chartType === "ACTIVITY"
+  const isHeatmap = chartType === "HEAT_MAP"
+
   let numberOfDepthLevels: number | undefined = undefined
   switch (depthType) {
     case "One":
@@ -90,6 +114,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   }
 
   const filetree = useMemo(() => {
+    if (isActivity || isHeatmap) return databaseInfo.fileTree
     // TODO: make filtering faster, e.g. by not having to refetch everything every time
     const ig = ignore()
     ig.add(databaseInfo.hiddenFiles)
@@ -100,6 +125,8 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       children: flatten(filtered)
     } as GitTreeObject
   }, [
+    isActivity,
+    isHeatmap,
     databaseInfo.fileTree,
     hierarchyType,
     databaseInfo.hiddenFiles,
@@ -108,6 +135,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
   ])
 
   const nodes = useMemo(() => {
+    if (isActivity || isHeatmap) return []
     console.time("nodes")
     if (size.width === 0 || size.height === 0) return []
     const res = createPartitionedHiearchy(
@@ -125,7 +153,8 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
       selectedAuthors,
       fileGroups,
       selectedFilePaths, // Add this parameter
-      fileAuthorMode // Add this parameter
+      fileAuthorMode,
+      cohesionRatio
     ).descendants()
     console.timeEnd("nodes")
     return res
@@ -142,7 +171,8 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
     selectedAuthors,
     fileGroups,
     selectedFilePaths,
-    fileAuthorMode
+    fileAuthorMode,
+    cohesionRatio
   ])
 
   useEffect(() => {
@@ -188,7 +218,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
 
               // Special handling for FILE_AUTHORS grouping
               if (groupingType === "FILE_AUTHORS" && fileGroups.length > 1) {
-                setSelectedAuthor(null)
+                setSelectedAuthorName("")
                 // Clicking a group container zooms into that group
                 if (isTree(d.data) && d.data.path.startsWith("/group-")) {
                   console.log("FILE_AUTHORS: Zooming into group:", d.data.path)
@@ -235,6 +265,23 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
         .slice(0, 5)
         .map(([author2]) => author2)
     : []
+  // Render activity if selected
+  if (isActivity) {
+    return (
+      <div className="relative grid h-full place-items-center overflow-hidden !transition-none" ref={ref}>
+        <Activity filetree={filetree} sizeMetric={sizeMetric} />
+      </div>
+    )
+  }
+
+  // Render heatmap if selected
+  if (isHeatmap) {
+    return (
+      <div className="relative grid h-full place-items-center overflow-hidden !transition-none" ref={ref}>
+        <Heatmap filetree={filetree} sizeMetric={sizeMetric} />
+      </div>
+    )
+  }
 
   return (
     <div className="relative grid place-items-center overflow-hidden" ref={ref}>
@@ -319,8 +366,8 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
 
                 // Opacity, show top co authors
                 const isInTop = author1 === selectedAuthor && topCoAuthors.includes(author2)
-                const lineOpacity = isInTop ? 0.9 : 0.1
-
+                let lineOpacity = isInTop ? 0.9 : 0.1
+                groupingType === "COMMUNITY" ? (lineOpacity = 0) : null
                 // ...existing code...
                 if (!selectedAuthor) {
                   return [
@@ -369,7 +416,7 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
                       onMouseLeave={() => setHoveredObject(null)}
                     />
                   ]
-                } else if (selectedAuthor && isInTop) {
+                } else if (selectedAuthor && isInTop && groupingType === "DEFAULT") {
                   return [
                     <line
                       key={`rel-${author1}-${author2}-1`}
@@ -402,11 +449,12 @@ export const Chart = memo(function Chart({ setHoveredObject }: { setHoveredObjec
         {/* Draw author nodes and other nodes */}
         {(() => {
           return nodes.map((d, i) => {
-            const nodeOpacity = !selectedAuthor
-              ? "opacity-100" // all visible when no author selected
-              : selectedAuthor === d.data.name || topCoAuthors.includes(d.data.name)
-                ? "opacity-100" // top coauthors or selected author
-                : "opacity-30"
+            const nodeOpacity =
+              !selectedAuthor || groupingType !== "DEFAULT"
+                ? "opacity-100" // all visible when no author selected
+                : selectedAuthor === d.data.name || topCoAuthors.includes(d.data.name)
+                  ? "opacity-100" // top coauthors or selected author
+                  : "opacity-30"
 
             return (
               <g
@@ -499,9 +547,15 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
     let fillColor: string
 
     if (chartType === "AUTHOR_GRAPH" && d.data.path.includes("/@")) {
-      // For author graph, use the authorColor property
+      // For author graph, prefer community color if present, otherwise per-author color
       const authorName = d.data.name
-      fillColor = authorColors.get(authorName) || "#cccccc"
+      // Some author nodes may include a precomputed communityColor property
+      //TODO: SELECT COMMUNITY COLOR ONLY IF GROUPING COMMUNITY IS SELECTED
+      if (groupingType === "COMMUNITY") {
+        fillColor = (d.data as any).communityColor as string
+      } else {
+        fillColor = authorColors.get(authorName) ?? "#cccccc"
+      }
     } else if (groupingType === "FILE_AUTHORS" && d.data.path.includes("/@")) {
       // For file authors view, use author colors
       const authorName = d.data.name
@@ -557,7 +611,7 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
   }, [d, metricsData, metricType, chartType, groupingType]) // Add groupingType to dependencies
 
   // Don't render the author-network container node in AUTHOR_GRAPH
-  if (chartType === "AUTHOR_GRAPH" && d.data.name === "author-network") {
+  if (chartType === "AUTHOR_GRAPH" && d.data.name === "author-network" && groupingType === "DEFAULT") {
     return null
   }
 
@@ -718,7 +772,8 @@ function createPartitionedHiearchy(
   selectedAuthors: string[],
   fileGroups: Array<{ id: string; name: string; pattern: string; filePaths: string[] }>,
   selectedFilePaths: string[], // Add this parameter
-  fileAuthorMode: "groups" | "individual" // Add this parameter
+  fileAuthorMode: "groups" | "individual", // Add this parameter
+  cohesionRatio: number
 ) {
   let currentTree = tree
   const steps = path.substring(tree.name.length + 1).split("/")
@@ -955,13 +1010,16 @@ function createPartitionedHiearchy(
     return bPartition
   } else if (chartType === "AUTHOR_GRAPH") {
     // Create a network/graph layout for author relationships
+
     const authorNetwork = createAuthorNetworkHierarchy(
       databaseInfo,
       currentTree,
       sizeMetricType,
       minBubbleSize,
       maxBubbleSize,
-      selectedAuthors
+      selectedAuthors,
+      groupingType,
+      cohesionRatio
     )
 
     // Apply a custom sum function that gives each author a fixed size
@@ -1239,10 +1297,12 @@ function createAuthorFileHierarchy(
 function createAuthorNetworkHierarchy(
   databaseInfo: DatabaseInfo,
   tree: GitTreeObject,
-  sizeMetricType: string,
+  sizeMetricType: SizeMetricType,
   minBubbleSize: number,
   maxBubbleSize: number,
-  selectedAuthors: string[]
+  selectedAuthors: string[],
+  groupingType: GroupingType,
+  cohesionRatio: number
 ): HierarchyNode<GitObject> {
   const fixedAuthorSize = 1000
 
@@ -1259,6 +1319,25 @@ function createAuthorNetworkHierarchy(
 
   // Get relationships map
   const relationshipsMap = getAuthorsRelationships(databaseInfo)
+  // Build community partition and community color mapping
+  const partition = getAuthorGroups(relationshipsMap, sizeMetricType, cohesionRatio)
+  const communityIds = Array.from(new Set(Object.values(partition)))
+  function hashCode(str: string) {
+    let h = 0
+    for (let i = 0; i < str.length; i++) {
+      h = (Math.imul(31, h) + str.charCodeAt(i)) | 0
+    }
+    return Math.abs(h)
+  }
+
+  function colorForCommunity(id: string) {
+    const n = Number(id)
+    const hue = Number.isFinite(n) && !Number.isNaN(n) ? (n * 137.508) % 360 : hashCode(id) % 360
+    return `hsl(${hue} 70% 50%)`
+  }
+
+  const communityColorMap = new Map<string, string>()
+  communityIds.forEach((id) => communityColorMap.set(id, colorForCommunity(String(id))))
 
   const authorNodes: GitBlobObject[] = authorEntries.map(([author, stats], index) => {
     let value: number
@@ -1266,6 +1345,7 @@ function createAuthorNetworkHierarchy(
       case "MOST_COMMITS":
         value = stats["nb_commits"] ?? 1
         break
+      case "FILE_SIZE":
       case "MOST_CONTRIBS":
         value = stats["nb_line_change"] ?? 1
         break
@@ -1280,6 +1360,9 @@ function createAuthorNetworkHierarchy(
     const maxSize = maxBubbleSize
     const scaledSize = minSize + (maxSize - minSize) * Math.sqrt(normalizedSize)
 
+    const communityId = partition[author] ?? "0"
+    const communityColor = communityColorMap.get(communityId)
+
     return {
       type: "blob",
       name: author,
@@ -1290,9 +1373,41 @@ function createAuthorNetworkHierarchy(
       nb_line_change: stats.nb_line_change ?? 0,
       sizeInBytes: scaledSize * fixedAuthorSize,
       size: scaledSize * fixedAuthorSize,
-      relationships: relationshipsMap[author]?.Relationships ?? {} // <-- Add relationships here
+      relationships: relationshipsMap[author]?.Relationships ?? {}, // <-- Add relationships here
+      communityId,
+      communityColor
     }
   })
+
+  if (groupingType === "COMMUNITY") {
+    const communityMap: Record<string, GitBlobObject[]> = {}
+    for (const node of authorNodes) {
+      const cid = (node as any).communityId ?? "0"
+      if (!communityMap[cid]) communityMap[cid] = []
+      node.path = tree.path + `/community-${cid}/@${node.name}`
+      communityMap[cid].push(node)
+    }
+
+    const communityNodes: GitTreeObject[] = Object.entries(communityMap).map(([cid, members]) => {
+      return {
+        type: "tree",
+        name: `community-${cid}`,
+        path: tree.path + `/community-${cid}`,
+        children: members,
+        hash: hashString(`community-${cid}-` + members.map((m) => m.hash).join(","))
+      }
+    })
+
+    const authorNetworkByCommunityRoot: GitTreeObject = {
+      type: "tree",
+      name: "author-network-group",
+      path: tree.path,
+      children: communityNodes,
+      hash: hashString("author-network-by-community" + communityNodes.map((c) => c.hash).join(","))
+    }
+    return hierarchy(authorNetworkByCommunityRoot as GitObject)
+  }
+  // Group authors by community into tree nodes
 
   const authorNetworkRoot: GitTreeObject = {
     type: "tree",
@@ -1306,73 +1421,166 @@ function createAuthorNetworkHierarchy(
 }
 
 export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
-  const relationshipMap: Record<
-    string,
-    {
-      Relationships: Record<
-        string,
-        {
-          commonFiles: string[]
-          author1Contribs: { nb_commits: number; nb_line_change: number }
-          author2Contribs: { nb_commits: number; nb_line_change: number }
-        }
-      >
-    }
-  > = {}
-
+  const relationshipMap: RelationshipMap = {}
   const authorsFileStats = databaseInfo.authorsFilesStats
   const authors = Object.keys(authorsFileStats)
 
-  // Initialize all authors first
+  let maxCommon = 0 // only need count
+
+  // 1. Initialize authors
   for (const author of authors) {
-    if (!relationshipMap[author]) relationshipMap[author] = { Relationships: {} }
+    relationshipMap[author] = { Relationships: {} }
   }
+
+  // Pre-compute and cache file lists for each author to avoid repeated Object.keys() calls
+  const authorFilesCache = new Map<string, string[]>()
+  const authorFilesSetCache = new Map<string, Set<string>>()
+
+  for (const author of authors) {
+    const files = Object.keys(authorsFileStats[author])
+    authorFilesCache.set(author, files)
+    authorFilesSetCache.set(author, new Set(files))
+  }
+
+  // 2. Compute relationships + track max common
+  const rawRelationships: {
+    author1: string
+    author2: string
+    commonFiles: string[]
+  }[] = []
 
   for (let i = 0; i < authors.length; i++) {
     const author1 = authors[i]
+    const files1 = authorFilesCache.get(author1)
+    if (!files1) continue
 
     for (let j = i + 1; j < authors.length; j++) {
       const author2 = authors[j]
+      const files2Set = authorFilesSetCache.get(author2)
+      if (!files2Set) continue
 
-      // Find common files
-      const files1 = Object.keys(authorsFileStats[author1])
-      const files2 = Object.keys(authorsFileStats[author2])
       const commonFiles = files1.filter((f) => {
-        if (!files2.includes(f)) return false
+        if (!files2Set.has(f)) return false
         const lc1 = authorsFileStats[author1][f].nb_line_change
         const lc2 = authorsFileStats[author2][f].nb_line_change
         return (lc1 >= 0.2 * lc2 && lc2 > 0) || (lc2 >= 0.2 * lc1 && lc1 > 0)
       })
 
       if (commonFiles.length > 0) {
-        const relData = {
-          commonFiles,
-          author1Contribs: commonFiles.reduce(
-            (acc, file) => ({
-              nb_commits: acc.nb_commits + authorsFileStats[author1][file].nb_commits,
-              nb_line_change: acc.nb_line_change + authorsFileStats[author1][file].nb_line_change
-            }),
-            { nb_commits: 0, nb_line_change: 0 }
-          ),
-          author2Contribs: commonFiles.reduce(
-            (acc, file) => ({
-              nb_commits: acc.nb_commits + authorsFileStats[author2][file].nb_commits,
-              nb_line_change: acc.nb_line_change + authorsFileStats[author2][file].nb_line_change
-            }),
-            { nb_commits: 0, nb_line_change: 0 }
-          )
-        }
-        relationshipMap[author1].Relationships[author2] = relData
-        relationshipMap[author2].Relationships[author1] = {
-          commonFiles,
-          author1Contribs: relData.author2Contribs,
-          author2Contribs: relData.author1Contribs
-        }
+        rawRelationships.push({ author1, author2, commonFiles })
+        if (commonFiles.length > maxCommon) maxCommon = commonFiles.length
       }
     }
   }
 
+  // 3. Now compute ratios + fill map
+  for (const rel of rawRelationships) {
+    const { author1, author2, commonFiles } = rel
+
+    const author1Contribs = commonFiles.reduce(
+      (acc, file) => ({
+        nb_commits: acc.nb_commits + authorsFileStats[author1][file].nb_commits,
+        nb_line_change: acc.nb_line_change + authorsFileStats[author1][file].nb_line_change
+      }),
+      { nb_commits: 0, nb_line_change: 0 }
+    )
+
+    const author2Contribs = commonFiles.reduce(
+      (acc, file) => ({
+        nb_commits: acc.nb_commits + authorsFileStats[author2][file].nb_commits,
+        nb_line_change: acc.nb_line_change + authorsFileStats[author2][file].nb_line_change
+      }),
+      { nb_commits: 0, nb_line_change: 0 }
+    )
+
+    const totalCommits = author1Contribs.nb_commits + author2Contribs.nb_commits
+    const totalLineChange = author1Contribs.nb_line_change + author2Contribs.nb_line_change
+
+    // COMPUTE ratios
+    const fileChangeRatio = maxCommon > 0 ? (commonFiles.length / maxCommon) * 100 : 0
+
+    const cohesions = {
+      file_change: fileChangeRatio,
+      commits:
+        totalCommits > 0
+          ? (1 - Math.abs(author1Contribs.nb_commits - author2Contribs.nb_commits) / totalCommits) * 100
+          : 0,
+      line_change:
+        totalLineChange > 0
+          ? (1 - Math.abs(author1Contribs.nb_line_change - author2Contribs.nb_line_change) / totalLineChange) * 100
+          : 0
+    }
+
+    relationshipMap[author1].Relationships[author2] = {
+      commonFiles,
+      author1Contribs,
+      author2Contribs,
+      cohesions
+    }
+
+    relationshipMap[author2].Relationships[author1] = {
+      commonFiles,
+      author1Contribs: author2Contribs,
+      author2Contribs: author1Contribs,
+      cohesions
+    }
+  }
+
   return relationshipMap
+}
+
+interface Edge {
+  source: string
+  target: string
+  weight: number
+}
+
+function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeMetricType, cohesionRatio: number) {
+  // We get the list of author names that have relationships.
+  const node_data = Object.keys(relationshipMap)
+
+  // We get the list of edges and their weight, while keeping a hashmap to avoid duplicates.
+  const existingEdges: Map<string, boolean> = new Map<string, boolean>()
+  const edge_data: Edge[] = [] as Edge[]
+  // We iterate over every node.
+  node_data.forEach((node) => {
+    // For every node, we iterate over it's relationships in the relationshipMap.
+    for (const [key, value] of Object.entries(relationshipMap[node].Relationships)) {
+      // We check if the Edge already exists between these nodes in the hashmap.
+      // If not, create it.
+      if (!existingEdges.has(node + ";" + key) && !existingEdges.has(key + ";" + node)) {
+        // --Calculate weight here--
+        const cohesion =
+          sizeMetricType === "MOST_CONTRIBS"
+            ? value.cohesions.line_change
+            : sizeMetricType === "MOST_COMMITS"
+              ? value.cohesions.commits
+              : value.cohesions.file_change
+        console.log("cohesion", cohesion)
+        console.log("cohesionRatio: ", cohesionRatio)
+        if (cohesion > cohesionRatio) {
+          edge_data.push({
+            source: node,
+            target: key,
+            weight: cohesion
+          })
+          // Add new pair to existing Edges.
+          existingEdges.set(node + ";" + key, true)
+        }
+      }
+    }
+  })
+  // --Code for grouping using library here--
+  // Use the typed wrapper around the bundled jLouvain implementation
+  try {
+    const community = jLouvain().nodes(node_data).edges(edge_data)
+    const partition = community()
+    console.log("jLouvain partition:", partition)
+    return partition
+  } catch (err) {
+    console.error("jLouvain error:", err)
+    return {}
+  }
 }
 
 // Helper function to create author nodes for a specific file
@@ -1465,6 +1673,7 @@ function createAggregatedAuthorNodesForGroup(
           case "MOST_CONTRIBS":
             contribution = fileStats[filePath].nb_line_change || 0
             break
+          case "FILE_SIZE":
           case "EQUAL_SIZE":
             contribution = 1 // Each file counts as 1 for this author
             break

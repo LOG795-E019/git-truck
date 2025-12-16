@@ -9,7 +9,9 @@ import { Depth, type DepthType } from "~/metrics/chartDepth"
 export const Chart = {
   BUBBLE_CHART: "Bubble Chart",
   TREE_MAP: "Tree Map",
-  AUTHOR_GRAPH: "Author Graph"
+  AUTHOR_GRAPH: "Author Graph",
+  ACTIVITY: "Activity",
+  HEAT_MAP: "Heatmap"
 } as const
 
 export type ChartType = keyof typeof Chart
@@ -66,7 +68,10 @@ export type Options = {
   selectedFiles: string[]
   fileGroups: FileGroup[]
   selectedFilePaths: string[] // Keep this for individual files
-  fileAuthorMode: "groups" | "individual" // Add this new property
+  fileAuthorMode: "groups" | "individual" 
+  cohesionRatio: number// Add this new property
+  minFilesChanged: number
+  maxContributors: number
 }
 
 export type OptionsContextType = Options & {
@@ -92,7 +97,10 @@ export type OptionsContextType = Options & {
   setSelectedFiles: (files: string[]) => void
   setSelectedFilePaths: (filePaths: string[]) => void // Updated setter
   setFileGroups: (fileGroups: FileGroup[]) => void // Add this line
-  setFileAuthorMode: (mode: "groups" | "individual") => void // Add this line
+  setFileAuthorMode: (mode: "groups" | "individual") => void 
+  setCohesionRatio: (cohesion: number) => void
+  setMinFilesChanged: (value: number) => void
+  setMaxContributors: (value: number) => void
 }
 
 export const OptionsContext = createContext<OptionsContextType | undefined>(undefined)
@@ -129,7 +137,10 @@ const defaultOptions: Options = {
   selectedFiles: [],
   fileGroups: [],
   selectedFilePaths: [],
-  fileAuthorMode: "individual" // Default to individual mode
+  cohesionRatio:60,
+  fileAuthorMode: "individual", // Default to individual mode
+  minFilesChanged: 1,
+  maxContributors: 15
 }
 
 export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {}): OptionsContextType {
@@ -204,6 +215,15 @@ export function getDefaultOptionsContextValue(savedOptions: Partial<Options> = {
     },
     setFileAuthorMode: () => {
       throw new Error("No setFileAuthorModeSetter provided")
-    }
+    },
+    setCohesionRatio: () => {
+      throw new Error("No setCohesionRatio provided")
+    },
+    setMinFilesChanged: () => {
+      throw new Error("No setMinFilesChangedSetter provided")
+    },
+    setMaxContributors: () => {
+      throw new Error("No setMaxContributorsSetter provided")
+    },
   }
 }

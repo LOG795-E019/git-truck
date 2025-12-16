@@ -1,0 +1,34 @@
+@startuml
+participant "$repo.$.tsx" as R
+participant "MetricsCard.tsx" as MC
+participant "DB.server.ts" as DB
+participant "DuckDB" as DDB
+
+-> R: Appel URL de la route d'un repository
+' Nous allons chercher le nombre d'auteur par fichier.
+R -> DB: getAuthorCountPerFile()
+DB -> DDB: QUERY VIEW filechanges_commits_renamed 
+R <-- DB: authorCounts (pour chaque fichier)
+' Nous allons chercher des informations générales sur chaque auteur.
+R -> DB: getAuthorsTotalStats()
+DB -> DDB: QUERY VIEW filechanges_commits_renamed 
+R <-- DB: authorsTotalStats (pour chaque auteur)
+' Nous allons chercher des informations générales sur chaque auteur.
+R -> DB: getCommitCountPerTime()
+DB -> DDB: QUERY TABLE commits
+R <-- DB: commitCountPerDay (pour chaque auteur)
+' L'information recueuillie est envoyée à MetricsCard.tsx dans un objet databaseInfo.
+R -> MC: databaseInfo
+' Calculer les métriques avec l'information reçue.
+MC -> MC: Calculer Bus Factor Risk
+MC -> MC: Calculer Ownership Distribution
+MC -> MC: Calculer Activity
+MC -> MC: Calculer Repository Health Score
+MC -> MC: Calculer autres métriques (ex: Stale Files)
+' Construire l'onglet MetricsCard.
+MC -> MC: Créer l'onglet MetricsCard
+' La route repo peut désormais afficher 
+R <-- MC: MetricsCard
+R -> R: Insérer MetricsCard dans l'UI
+<-- R: Afficher l'UI 
+@enduml

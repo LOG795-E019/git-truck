@@ -1,0 +1,46 @@
+@startuml duckdb_diagram
+hide empty methods
+
+entity commits {
+    hash: VARCHAR
+    author: VARCHAR
+    committertime: UINTEGER
+    authortime: UINTEGER
+}
+entity filechanges {
+    commithash: VARCHAR
+    filepath: VARCHAR
+    insertions: UINTEGER
+    deletions: UINTEGER
+}
+entity authorunions {
+    alias: VARCHAR
+    actualname: VARCHAR
+}
+entity renames {
+    fromname: VARCHAR
+    toname: VARCHAR
+    timestamp: UINTEGER
+    timestampauthor UINTEGER
+}
+entity hiddenfiles {
+    path: VARCHAR
+}
+entity metadata {
+    field: VARCHAR
+    value: UBIGINT
+    value2: VARCHAR
+}
+entity temporary_renames {
+    fromname: VARCHAR
+    toname: VARCHAR
+    timestamp: UINTEGER
+    timestampend: UINTEGER 
+}
+entity files {
+    path: VARCHAR
+}
+
+
+
+@enduml

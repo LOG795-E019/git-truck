@@ -27,7 +27,11 @@ import {
   mdiTextBox,
   mdiAccountMultiple,
   mdiFilter,
-  mdiFileMultiple
+  mdiFileMultiple,
+  mdiAccount,
+  mdiAccountSupervisorCircle,
+  mdiChartBox,
+  mdiGrid
 } from "@mdi/js"
 import type { SizeMetricType } from "~/metrics/sizeMetric"
 import { SizeMetric } from "~/metrics/sizeMetric"
@@ -51,18 +55,21 @@ export const Options = memo(function Options() {
     groupingType,
     selectedAuthors,
     selectedFiles,
+    cohesionRatio,
     setMetricType,
     setChartType,
     setSizeMetricType,
     setGroupingType,
     setSelectedAuthors,
     setSelectedFiles,
-    setSelectedFilePaths
+    setSelectedFilePaths,
+    setCohesionRatio
   } = useOptions()
 
   const { databaseInfo } = useData()
   const [showAuthorFilter, setShowAuthorFilter] = useState(false)
   const [showFileFilter, setShowFileFilter] = useState(false)
+  const [showCommunityDescription, setShowCommunityDescription] = useState(false)
   const [searchFilter, setSearchFilter] = useState("")
   const [fileSearchFilter, setFileSearchFilter] = useState("")
   const [fileExtensionFilter, setFileExtensionFilter] = useState("")
@@ -72,6 +79,9 @@ export const Options = memo(function Options() {
   const [maxLineChanges, setMaxLineChanges] = useState<number | undefined>(undefined)
   const authorInitializedRef = useRef(false)
   const filesInitializedRef = useRef(false)
+
+  // Heatmap options sliders
+  const { minFilesChanged, setMinFilesChanged, maxContributors, setMaxContributors } = useOptions()
 
   // Get all authors and files from database
   const allAuthors = Object.keys(databaseInfo?.authorsTotalStats || {})
@@ -90,6 +100,12 @@ export const Options = memo(function Options() {
       authorInitializedRef.current = true
     }
   }, [allAuthors, selectedAuthors, setSelectedAuthors])
+
+  useEffect(() => {
+    if (cohesionRatio === undefined) {
+      setCohesionRatio(60)
+    }
+  }, [cohesionRatio, setCohesionRatio])
 
   useEffect(() => {
     if (
@@ -188,22 +204,58 @@ export const Options = memo(function Options() {
       } as Record<SizeMetricType, string>
     }
 
+    if (chartType === "ACTIVITY") {
+      // For activity, only show relevant metrics
+      return {
+        MOST_COMMITS: allIcons.MOST_COMMITS,
+        MOST_CONTRIBS: allIcons.MOST_CONTRIBS,
+        FILE_SIZE: allIcons.FILE_SIZE
+      } as Record<SizeMetricType, string>
+    }
+
+    if (chartType === "HEAT_MAP") {
+      // For heatmap, only show relevant metrics
+      return {
+        MOST_COMMITS: allIcons.MOST_COMMITS,
+        MOST_CONTRIBS: allIcons.MOST_CONTRIBS,
+        FILE_SIZE: allIcons.FILE_SIZE
+      } as Record<SizeMetricType, string>
+    }
+
     return allIcons
-  }, [groupingType])
+  }, [groupingType, chartType])
 
   const groupingTypeIcons: Record<GroupingType, string> = {
     FILE_TYPE: mdiFileCodeOutline,
     FOLDER_NAME: mdiFolder,
     JSON_RULES: mdiTextBox,
     AUTHOR_FILES: mdiAccountMultiple,
-    FILE_AUTHORS: mdiAccountNetwork
+    FILE_AUTHORS: mdiAccountNetwork,
+    DEFAULT: mdiAccount,
+    COMMUNITY: mdiAccountSupervisorCircle
   }
 
   const chartTypeIcons: Record<ChartType, string> = {
     BUBBLE_CHART: mdiChartBubble,
     TREE_MAP: mdiChartTree,
-    AUTHOR_GRAPH: mdiAccountNetwork
+    AUTHOR_GRAPH: mdiAccountNetwork,
+    ACTIVITY: mdiChartBox,
+    HEAT_MAP: mdiGrid
   }
+
+  // Compute grouping options depending on chart type. When not in AUTHOR_GRAPH,
+  // exclude DEFAULT and COMMUNITY. Use strict equality checks.
+  const groupingOptions = useMemo(() => {
+    if (chartType === "AUTHOR_GRAPH") {
+      return Object.fromEntries(
+        Object.entries(Grouping).filter(([key]) => key === "DEFAULT" || key === "COMMUNITY")
+      ) as Record<GroupingType, string>
+    }
+
+    return Object.fromEntries(
+      Object.entries(Grouping).filter(([key]) => key !== "DEFAULT" && key !== "COMMUNITY")
+    ) as Record<GroupingType, string>
+  }, [chartType])
 
   // Buttons Behaviors
   const toggleAuthor = (author: string) => {
@@ -260,6 +312,7 @@ export const Options = memo(function Options() {
     setMinLineChanges(undefined)
     setMaxLineChanges(undefined)
     setSearchFilter("")
+    setCohesionRatio(60)
   }
 
   const resetAllFilters = () => {
@@ -293,47 +346,64 @@ export const Options = memo(function Options() {
           <EnumSelect
             enum={
               chartType === "AUTHOR_GRAPH"
-                ? (Object.fromEntries(
-                    Object.entries(SizeMetric).filter(([key]) => key !== "FILE_SIZE" && key !== "LAST_CHANGED")
-                  ) as Record<SizeMetricType, string>)
-                : SizeMetric
+                ? ({
+                    MOST_COMMITS: SizeMetric.MOST_COMMITS,
+                    MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
+                    FILE_SIZE: "Shared files"
+                  } as Record<SizeMetricType, string>)
+                : chartType === "ACTIVITY"
+                  ? ({
+                      MOST_COMMITS: SizeMetric.MOST_COMMITS,
+                      MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
+                      FILE_SIZE: "Files changed"
+                    } as Record<SizeMetricType, string>)
+                  : chartType === "HEAT_MAP"
+                    ? ({
+                        MOST_COMMITS: SizeMetric.MOST_COMMITS,
+                        MOST_CONTRIBS: SizeMetric.MOST_CONTRIBS,
+                        FILE_SIZE: "Shared files"
+                      } as Record<SizeMetricType, string>)
+                    : SizeMetric
             }
             defaultValue={sizeMetric}
             onChange={(sizeMetric: SizeMetricType) => setSizeMetricType(sizeMetric)}
             iconMap={sizeMetricIcons}
           />
         </fieldset>
-        {chartType !== "AUTHOR_GRAPH" && groupingType !== "FILE_AUTHORS" && (
-          <fieldset className="rounded-lg border p-2">
-            <legend className="card__title ml-1.5 justify-start gap-2">
-              <Icon path={mdiPalette} size="1.25em" />
-              Color
-            </legend>
-            <EnumSelect
-              enum={Metric}
-              defaultValue={metricType}
-              onChange={(metric: MetricType) => {
-                setMetricType(metric)
-                if (!linkMetricAndSizeMetric) {
-                  return
-                }
-                const relatedSizeMetricType = relatedSizeMetric[metric]
-                if (relatedSizeMetricType) {
-                  setSizeMetricType(relatedSizeMetricType)
-                }
-              }}
-              iconMap={visualizationIcons}
-            />
-          </fieldset>
-        )}
-        {chartType !== "AUTHOR_GRAPH" && (
+        {chartType !== "AUTHOR_GRAPH" &&
+          chartType !== "ACTIVITY" &&
+          chartType !== "HEAT_MAP" &&
+          groupingType !== "FILE_AUTHORS" && (
+            <fieldset className="rounded-lg border p-2">
+              <legend className="card__title ml-1.5 justify-start gap-2">
+                <Icon path={mdiPalette} size="1.25em" />
+                Color
+              </legend>
+              <EnumSelect
+                enum={Metric}
+                defaultValue={metricType}
+                onChange={(metric: MetricType) => {
+                  setMetricType(metric)
+                  if (!linkMetricAndSizeMetric) {
+                    return
+                  }
+                  const relatedSizeMetricType = relatedSizeMetric[metric]
+                  if (relatedSizeMetricType) {
+                    setSizeMetricType(relatedSizeMetricType)
+                  }
+                }}
+                iconMap={visualizationIcons}
+              />
+            </fieldset>
+          )}
+        {chartType !== "ACTIVITY" && chartType !== "HEAT_MAP" && (
           <fieldset className="rounded-lg border p-2">
             <legend className="card__title ml-1.5 justify-start gap-2">
               <Icon path={mdiGroup} size="1.25em" />
               Grouping
             </legend>
             <EnumSelect
-              enum={Grouping}
+              enum={groupingOptions}
               defaultValue={groupingType}
               onChange={(newGroupingType: GroupingType) => {
                 setGroupingType(newGroupingType)
@@ -352,6 +422,51 @@ export const Options = memo(function Options() {
               }}
               iconMap={groupingTypeIcons}
             />
+          </fieldset>
+        )}
+
+        {chartType === "AUTHOR_GRAPH" && groupingType === "COMMUNITY" && (
+          <fieldset className="mt-2 rounded-lg border p-2">
+            <legend className="card__title ml-1.5 justify-start gap-2">
+              <Icon path={mdiAccountSupervisorCircle} size="1.25em" />
+              Community Grouping Description
+              <button className="btn btn-xs ml-auto" onClick={() => setShowCommunityDescription(!showCommunityDescription)}>
+                  {showCommunityDescription ? "Hide" : "Show"}
+              </button>
+            </legend>
+
+            {showCommunityDescription && (
+              <div className="mt-2 flex flex-col gap-4">
+                {/* Minimum files changed */}
+                <label className="text-sm font-medium text-gray-700">
+                  <b>Community Grouping</b> groups authors together depending on the current <b>Size</b> metric chosen, which will be used to determine the weight of a relationship between two authors.
+                </label>
+                {sizeMetric == "MOST_COMMITS" && (
+                  <label className="text-sm font-medium text-gray-700">
+                    For <b>Commits</b> metric, the closer the percentage of total commits shared between two authors, the higher the weight of their relationship.
+                    <br/><br/>
+                    For example, if Author A shares 40% of their commits with Author B, who in turn shares 60% of their commits with them (thus 20% difference), then that is a better relationship than if it was 10% for A and 70% for B (60% difference, further apart than 20% difference).
+                  </label>
+                )}
+                {sizeMetric == "MOST_CONTRIBS" && (
+                  <label className="text-sm font-medium text-gray-700">
+                    For <b>Line Changes</b> metric, the closer the percentage of author A's line changes that are within shared commits with another author B, is to the same percentage from said other author B from their point of view, the higher the weight of the relationship.
+                    <br/><br/>
+                    For example, if Author A shares 40% of their line changes with Author B, who in turn shares 60% of their line changes with them, then there is a better relationship than if it was 10% for A and 70% for B (20% difference is closer thus better than 60% difference).
+                  </label>
+                )}
+                {sizeMetric == "FILE_SIZE" && (
+                  <label className="text-sm font-medium text-gray-700">
+                    For <b>Shared Files</b> metric, the closer the percentage of total files shared, the higher the weight of the relationship.
+                    <br/><br/>
+                    For example, if Author A shares 40% of their files with Author B, who in turn shares 60% of their files with them, then there is a better relationship than if it was 10% for A and 70% for B (20% difference is closer thus better than 60% difference).
+                  </label>
+                )}
+                <label className="text-sm font-medium text-gray-700">
+                  <b>Author Graph Filter</b> determines the minimal cohesion (%) necessary for groups to form.
+                </label>
+              </div>
+            )}
           </fieldset>
         )}
 
@@ -737,6 +852,87 @@ export const Options = memo(function Options() {
               )}
             </fieldset>
           </>
+        )}
+
+        {chartType === "AUTHOR_GRAPH" && groupingType === "COMMUNITY" && (
+          <fieldset className="mt-2 rounded-lg border p-2">
+            <legend className="card__title ml-1.5 justify-start gap-2">
+              <Icon path={mdiGrid} size="1.25em" />
+              Author Graph Filter
+            </legend>
+
+            <div className="mt-2 flex flex-col gap-4">
+              {/* Minimum files changed */}
+              <label className="text-sm font-semibold text-gray-700">Cohesion Between Contributors (%)</label>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">
+                  {sizeMetric == "MOST_COMMITS"
+                    ? "Percentage of commits that contributors must share on the same files"
+                    : sizeMetric == "MOST_CONTRIBS"
+                      ? "Percentage of line changes that contributors must share on the same files"
+                      : "Percentage of files that contributors must have worked on together"}
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={10}
+                    max={90}
+                    step={10}
+                    value={cohesionRatio}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      setCohesionRatio(Number(e.target.value))
+                    }}
+                    className="flex-1"
+                  />
+                  <span className="w-12 text-right text-xs text-gray-500">{cohesionRatio}</span>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+        )}
+
+        {chartType === "HEAT_MAP" && (
+          <fieldset className="mt-2 rounded-lg border p-2">
+            <legend className="card__title ml-1.5 justify-start gap-2">
+              <Icon path={mdiGrid} size="1.25em" />
+              Heatmap Filters
+            </legend>
+
+            <div className="mt-2 flex flex-col gap-4">
+              {/* Minimum files changed */}
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">Minimum files changed</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={1}
+                    max={50}
+                    value={minFilesChanged}
+                    onChange={(e) => setMinFilesChanged(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <span className="w-12 text-right text-xs text-gray-500">{minFilesChanged}</span>
+                </div>
+              </div>
+
+              {/* Maximum users */}
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">Maximum contributors (sorted by metric)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={1}
+                    max={25}
+                    value={maxContributors}
+                    onChange={(e) => setMaxContributors(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <span className="w-12 text-right text-xs text-gray-500">{maxContributors}</span>
+                </div>
+              </div>
+            </div>
+          </fieldset>
         )}
       </div>
 

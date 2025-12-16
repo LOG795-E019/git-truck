@@ -1,0 +1,22 @@
+@startuml
+!theme plain
+title Git Truck — Séquence
+
+actor Utilisateur
+participant "Navigateur Web\n(React)" as UI
+participant "Remix Loader" as Remix
+participant "Backend Node.js" as Backend
+database "DuckDB" as DB
+database "Dépôt Git Local" as Git
+
+Utilisateur -> UI : Ouvre une vue
+UI -> Remix : Requête route
+Remix -> Backend : Demande données
+Backend -> Git : Lecture métadonnées (si besoin)
+Backend -> DB : Requête SQL
+DB --> Backend : Résultats
+Backend --> Remix : Données
+Remix --> UI : HTML/JSON (SSR)
+UI -> Utilisateur : Visualisation
+
+@enduml
