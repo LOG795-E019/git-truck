@@ -23,24 +23,23 @@ entity renames {
     timestamp: UINTEGER
     timestampauthor UINTEGER
 }
-entity hiddenfiles {
-    path: VARCHAR
-}
-entity metadata {
-    field: VARCHAR
-    value: UBIGINT
-    value2: VARCHAR
-}
 entity temporary_renames {
     fromname: VARCHAR
     toname: VARCHAR
     timestamp: UINTEGER
     timestampend: UINTEGER 
 }
+entity metadata {
+    field: VARCHAR
+    value: UBIGINT
+    value2: VARCHAR
+}
 entity files {
     path: VARCHAR
 }
-
+entity hiddenfiles {
+    path: VARCHAR
+}
 
 
 @enduml
