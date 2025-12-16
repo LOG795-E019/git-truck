@@ -338,10 +338,6 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
 
     const markerOffset = verticalLegendWidth + 5
 
-    // const scaleLegend = d3.scaleLinear().domain([minValue, maxValue]).range([verticalLegendHeight, 0])
-    // const addMarker = (value: number, label: string) => {
-    //   const yPos = scaleLegend(value)
-
     const sqrtScaleLegend = d3
       .scaleLinear()
       .domain([0, Math.sqrt(maxValue)])
@@ -373,22 +369,10 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
     addMarker(maxValue, "Max")
     addMarker(minValue, "Min")
 
-    // const colorScale = d3
-    //   .scaleSequential()
-    //   .domain([0, Math.sqrt(maxValue)])
-    //   .interpolator(d3.interpolateReds)
-
     // normalization for larger gaps between data
     const colorScale = d3.scaleSequentialLog().domain([1, maxValue]).interpolator(d3.interpolateReds)
 
     const legendSteps = 20
-    // for (let i = 0; i <= legendSteps; i++) {
-    //   const t = i / legendSteps // 0 → 1
-    //   gradient
-    //     .append("stop")
-    //     .attr("offset", `${t * 100}%`)
-    //     .attr("stop-color", colorScale(Math.sqrt(maxValue) * t))
-    // }
     for (let i = 0; i <= legendSteps; i++) {
       const value = 1 * Math.pow(maxValue / 1, i / legendSteps) // logarithmic spacing
       gradient
@@ -406,7 +390,6 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
           .attr("y", i * cellSize)
           .attr("width", cellSize)
           .attr("height", cellSize)
-          //.attr("fill", isDiagonal ? "#ccc" : value === 0 ? "#f5f5f5" : colorScale(Math.sqrt(value)) // using this with scaleSequential
           .attr("fill", isDiagonal ? "#ccc" : value === 0 ? "#f5f5f5" : colorScale(value)) // using this with scaleSequentialLog
           .attr("stroke", "#fff")
           .attr("stroke-width", 1)
