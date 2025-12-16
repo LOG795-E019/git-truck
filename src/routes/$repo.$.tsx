@@ -255,7 +255,6 @@ async function analyze(params: Params) {
   const timerange = await instance.db.getOverallTimeRange()
   let selectedRange = instance.db.selectedRange
   if (!selectedRange || selectedRange === timerange || (selectedRange[0] === 0 && selectedRange[1] === 1000000000000)) {
-    console.log("Using timerange as selectedRange:", timerange)
     selectedRange = timerange
   }
 

@@ -112,7 +112,6 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
   )
 
   useEffect(() => {
-    console.log("Heatmap data")
     const params = new URLSearchParams({
       repo: repo.name,
       branch: databaseInfo.branch,
@@ -242,7 +241,6 @@ const Heatmap = ({ filetree, sizeMetric }: HeatmapProps) => {
       return
     }
 
-    console.log("Heatmap: Starting D3 render...")
     const svgElement = svgRef.current
     const svg = d3.select(svgElement)
     svg.selectAll("*").remove()

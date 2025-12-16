@@ -417,7 +417,6 @@ const Activity = ({ filetree, sizeMetric }: Pick<ActivityProps, "filetree" | "si
   )
 
   const authors = Array.from(new Set(activityData.map((d) => d.author))).sort()
-  console.log("AUTHORS:", authors)
 
   const getMetricValue = useCallback(
     (d: ActivityDataPoint): number => {
@@ -538,8 +537,6 @@ const Activity = ({ filetree, sizeMetric }: Pick<ActivityProps, "filetree" | "si
     const width = parentRect?.width || 800
     const height = parentRect?.height || 600
 
-    console.log("Parent dimensions:", width, height, "ParentRect:", parentRect)
-
     const dataByDate = new Map<string, ActivityDataPoint>()
     filteredActivityData.forEach((d) => dataByDate.set(d.date, d))
 
@@ -566,8 +563,6 @@ const Activity = ({ filetree, sizeMetric }: Pick<ActivityProps, "filetree" | "si
     const xOffset = (width - gridWidth) / 2
     const yOffset = (height - gridHeight) / 2
 
-    console.log(`Year ${selectedYear} grid:`, numCols, "cols x", numRows, "rows")
-
     svg
       .attr("width", width)
       .attr("height", height)
@@ -593,7 +588,6 @@ const Activity = ({ filetree, sizeMetric }: Pick<ActivityProps, "filetree" | "si
       .domain([p25, p50, p75, p90])
       .range(["#fff7bc", "#fec44f", "#fe9929", "#d73027", "#a50026"])
 
-    console.log("Applying transform:", `translate(${xOffset},${yOffset})`)
     const g = svg
       .append("g")
       .attr("class", "activity-grid")
@@ -601,8 +595,6 @@ const Activity = ({ filetree, sizeMetric }: Pick<ActivityProps, "filetree" | "si
       .style("opacity", 1)
       .style("transition", "none !important")
       .style("animation", "none !important")
-
-    console.log("Group transform:", g.attr("transform"))
 
     // Add month labels above the grid
     let lastMonth = -1
