@@ -550,7 +550,7 @@ function Node({ d, isSearchMatch }: { d: CircleOrRectHiearchyNode; isSearchMatch
       // For author graph, prefer community color if present, otherwise per-author color
       const authorName = d.data.name
       // Some author nodes may include a precomputed communityColor property
-      //TODO: SELECT COMMUNITY COLOR ONLY IF GROUPING COMMUNITY IS SELECTED
+
       if (groupingType === "COMMUNITY") {
         fillColor = (d.data as any).communityColor as string
       } else {
@@ -1432,7 +1432,7 @@ export function getAuthorsRelationships(databaseInfo: DatabaseInfo) {
     relationshipMap[author] = { Relationships: {} }
   }
 
-  // Pre-compute and cache file lists for each author to avoid repeated Object.keys() calls
+  // Pre-compute and cache file lists for each author
   const authorFilesCache = new Map<string, string[]>()
   const authorFilesSetCache = new Map<string, Set<string>>()
 
@@ -1536,20 +1536,18 @@ interface Edge {
 }
 
 function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeMetricType, cohesionRatio: number) {
-  // We get the list of author names that have relationships.
+  // We get the list of author names that have relationships
   const node_data = Object.keys(relationshipMap)
 
-  // We get the list of edges and their weight, while keeping a hashmap to avoid duplicates.
+  // We get the list of edges and their weight, while keeping a hashmap to avoid duplicates
   const existingEdges: Map<string, boolean> = new Map<string, boolean>()
   const edge_data: Edge[] = [] as Edge[]
-  // We iterate over every node.
+
   node_data.forEach((node) => {
     // For every node, we iterate over it's relationships in the relationshipMap.
     for (const [key, value] of Object.entries(relationshipMap[node].Relationships)) {
-      // We check if the Edge already exists between these nodes in the hashmap.
-      // If not, create it.
+      // We check if the Edge already exists between these nodes in the hashmap. If not, create it
       if (!existingEdges.has(node + ";" + key) && !existingEdges.has(key + ";" + node)) {
-        // --Calculate weight here--
         const cohesion =
           sizeMetricType === "MOST_CONTRIBS"
             ? value.cohesions.line_change
@@ -1570,8 +1568,7 @@ function getAuthorGroups(relationshipMap: RelationshipMap, sizeMetricType: SizeM
       }
     }
   })
-  // --Code for grouping using library here--
-  // Use the typed wrapper around the bundled jLouvain implementation
+  // Use wrapper around jLouvain implementation
   try {
     const community = jLouvain().nodes(node_data).edges(edge_data)
     const partition = community()
@@ -1619,7 +1616,7 @@ function createAuthorNodesForFile(
     }
   })
 
-  // Sort by contribution (largest first) - but for EQUAL_SIZE they'll all be the same
+  // Sort by contribution (largest first) but for EQUAL_SIZE all be the same
   fileAuthors.sort((a, b) => b.contribution - a.contribution)
 
   // Calculate total for scaling
@@ -1702,10 +1699,6 @@ function createAggregatedAuthorNodesForGroup(
   const maxContribution = Math.max(...authorArray.map((item) => item.contribution))
   const minContribution = Math.min(...authorArray.map((item) => item.contribution))
 
-  console.log(
-    `Group ${group.name}: Total contrib: ${totalContribution}, Max: ${maxContribution}, Min: ${minContribution}`
-  ) // Debug
-
   return authorArray.map(({ author, contribution }, index) => {
     let scaledSize: number
 
@@ -1723,8 +1716,6 @@ function createAggregatedAuthorNodesForGroup(
       // Apply square root scaling to make differences more visible
       scaledSize = minSize + (maxSize - minSize) * Math.sqrt(contributionRatio)
     }
-
-    console.log(`Author ${author}: contribution=${contribution}, scaledSize=${scaledSize}`) // Debug
 
     return {
       type: "blob",
